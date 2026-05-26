@@ -118,6 +118,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.Trainer // <-- IMPORT TRAINER
+import com.chiko0085.testgym.ui.theme.TextSub
 
 // ── Palette ───────────────────────────────────────────────────────────────
 private val NightBlack   = Color(0xFF080C14)
@@ -130,15 +132,15 @@ private val ArcBlue      = Color(0xFF60A5FA)
 private val SteelGray    = Color(0xFF1E293B)
 private val SlateGray    = Color(0xFF334155)
 private val TextPrimary  = Color(0xFFF1F5F9)
-private val TextSub      = Color(0xFF94A3B8)
 private val ErrorRed     = Color(0xFFEF4444)
 private val GlassWhite   = Color(0x14FFFFFF)
 private val GlassBorder  = Color(0x26FFFFFF)
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (String, Member?) -> Unit,
-    memberList: List<Member>
+    onLoginSuccess: (String, Any?) -> Unit, // <-- UBAH KE Any? AGAR BISA TERIMA MEMBER & TRAINER
+    memberList: List<Member>,
+    trainerList: List<Trainer> // <-- TAMBAHKAN PARAMETER TRAINER LIST
 ) {
     var username       by remember { mutableStateOf("") }
     var password       by remember { mutableStateOf("") }
@@ -398,7 +400,7 @@ fun LoginScreen(
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
                                         imageVector     = if (passwordVisible) Icons.Default.Visibility
-                                                          else Icons.Default.VisibilityOff,
+                                        else Icons.Default.VisibilityOff,
                                         contentDescription = "Toggle password",
                                         tint = TextSub,
                                         modifier = Modifier.size(20.dp)
@@ -406,7 +408,7 @@ fun LoginScreen(
                                 }
                             },
                             visualTransformation = if (passwordVisible) VisualTransformation.None
-                                                   else PasswordVisualTransformation(),
+                            else PasswordVisualTransformation(),
                             isError = errorMessage.isNotEmpty()
                         )
 
@@ -449,14 +451,28 @@ fun LoginScreen(
                                     errorMessage = "Username dan Password tidak boleh kosong!"
                                     return@Button
                                 }
+
+                                // LOGIKA LOGIN MULTI-ROLE (ADMIN, MEMBER, TRAINER)
                                 if (username == "admin" && password == "admin123") {
                                     onLoginSuccess("admin", null)
                                 } else {
                                     val member = memberList.find {
                                         it.username == username && it.password == password
                                     }
-                                    if (member != null) onLoginSuccess("member", member)
-                                    else errorMessage = "Username atau Password salah!"
+                                    if (member != null) {
+                                        onLoginSuccess("member", member)
+                                        return@Button
+                                    }
+
+                                    val trainer = trainerList.find {
+                                        it.username == username && it.password == password
+                                    }
+                                    if (trainer != null) {
+                                        onLoginSuccess("trainer", trainer)
+                                        return@Button
+                                    }
+
+                                    errorMessage = "Username atau Password salah!"
                                 }
                             },
                             modifier = Modifier

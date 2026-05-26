@@ -19,15 +19,17 @@ fun App() {
     MaterialTheme {
         var currentScreen by remember { mutableStateOf("login") }
         var loggedInMemberId by remember { mutableStateOf<String?>(null) }
+        var loggedInTrainer by remember { mutableStateOf<Trainer?>(null) }
         var totalRevenue by remember { mutableDoubleStateOf(0.0) }
 
         // List ini sekarang kosong di awal, akan diisi dari Cloud!
         val memberList = remember { mutableStateListOf<Member>() }
+        val trainerList = remember { mutableStateListOf<Trainer>() }
 
         val gymPackages = remember {
             mutableStateListOf(
                 GymPackage("1", "Paket Hemat", 100000.0, 30),
-                GymPackage("2", "Paket Pro", 250000.0, 90)
+                GymPackage("2", "Paket Pro", 250000.0, 90),
             )
         }
 
@@ -41,7 +43,12 @@ fun App() {
                 memberList.clear()
                 memberList.addAll(membersFromDb)
 
-                println("INFO DATABASE: Sukses mengambil ${membersFromDb.size} member dari Supabase!")
+                // Ambil data trainer juga
+                val trainersFromDb = supabase.postgrest["trainers"].select().decodeList<Trainer>()
+                trainerList.clear()
+                trainerList.addAll(trainersFromDb)
+
+                println("INFO DATABASE: Sukses mengambil ${membersFromDb.size} member & ${trainersFromDb.size} trainer!")
             } catch (e: Exception) {
                 println("INFO DATABASE: Gagal mengambil data. Error: ${e.message}")
             }
@@ -50,15 +57,21 @@ fun App() {
 
         when (currentScreen) {
             "login" -> LoginScreen(
-                onLoginSuccess = { role, member ->
+                onLoginSuccess = { role, user ->
                     if (role == "admin") {
                         currentScreen = "admin_dashboard"
-                    } else if (member != null) {
-                        loggedInMemberId = member.id
-                        currentScreen = "member_main"
+                    } else if (user != null) {
+                        if (user is Member) {
+                            loggedInMemberId = user.id
+                            currentScreen = "member_main"
+                        } else if (user is Trainer) {
+                            loggedInTrainer = user
+                            currentScreen = "trainer_main"
+                        }
                     }
                 },
-                memberList = memberList
+                memberList = memberList,
+                trainerList = trainerList
             )
 
             "admin_dashboard" -> AdminDashboard(
@@ -83,6 +96,18 @@ fun App() {
                 } else {
                     currentScreen = "login"
                 }
+            }
+
+            "trainer_main" -> {
+                loggedInTrainer?.let { trainer ->
+                    TrainerMainScreen(
+                        trainer = trainer,
+                        onLogout = {
+                            loggedInTrainer = null
+                            currentScreen = "login"
+                        }
+                    )
+                } ?: run { currentScreen = "login" }
             }
         }
     }
