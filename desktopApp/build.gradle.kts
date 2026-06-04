@@ -26,3 +26,10 @@ compose.desktop {
         }
     }
 }
+
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("android.arch.lifecycle:common")).using(module("androidx.lifecycle:lifecycle-common:2.8.4"))
+        substitute(module("android.arch.lifecycle:runtime")).using(module("androidx.lifecycle:lifecycle-runtime:2.8.4"))
+    }
+}

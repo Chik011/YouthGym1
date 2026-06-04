@@ -1,11 +1,13 @@
 package com.chiko0085.testgym
 
-import java.awt.Desktop
-import java.net.URI
-// Tambahan import untuk membaca format tanggal
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import dev.gitlive.firebase.Firebase
+import dev.gitlive.firebase.initialize
+import dev.gitlive.firebase.FirebaseOptions
+import com.google.firebase.FirebasePlatform
+import android.app.Application
 
 class JVMPlatform: Platform {
     override val name: String = "Java ${System.getProperty("java.version")}"
@@ -14,17 +16,61 @@ class JVMPlatform: Platform {
 actual fun getPlatform(): Platform = JVMPlatform()
 
 actual fun openWebLink(url: String) {
-    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-        Desktop.getDesktop().browse(URI(url))
-    }
+    val os = System.getProperty("os.name").lowercase()
+    val rt = Runtime.getRuntime()
+    if (os.contains("win")) rt.exec("rundll32 url.dll,FileProtocolHandler $url")
+    else if (os.contains("mac")) rt.exec("open $url")
+    else rt.exec("xdg-open $url")
 }
 
 actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
 
-// --- TAMBAHAN BARU: Pekerja untuk mengubah angka menjadi teks kalender di Laptop/Desktop ---
 actual fun formatEpochToDate(millis: Long): String {
     if (millis <= 0L) return "-"
-    // Menampilkan format kalender versi Indonesia
     val sdf = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID"))
     return sdf.format(Date(millis))
+}
+
+// Global variable untuk menyimpan status inisialisasi agar tidak dipanggil berulang
+private var isFirebaseInitialized = false
+
+actual fun initFirebase() {
+    if (isFirebaseInitialized) return
+    
+    try {
+        // Initialize Firebase Platform for JVM/Desktop
+        FirebasePlatform.initializeFirebasePlatform(object : FirebasePlatform() {
+            private val prefs = java.util.prefs.Preferences.userRoot().node("com.chiko0085.testgym")
+            override fun store(key: String, value: String) {
+                prefs.put(key, value)
+            }
+            override fun retrieve(key: String): String? = prefs.get(key, null)
+            override fun clear(key: String) {
+                prefs.remove(key)
+            }
+            override fun log(msg: String) = println("FIREBASE: $msg")
+        })
+
+        val options = FirebaseOptions(
+            applicationId = "1:713442868886:android:40c655c252db2fda9bccb7",
+            apiKey = "AIzaSyCvGwpy_N4ZgEPfiPaUdvreCbcnrgpK-CE",
+            projectId = "youth-gym",
+            storageBucket = "youth-gym.firebasestorage.app"
+        )
+        
+        // Pada Desktop/JVM, gitlive-firebase butuh 'context' (stubbed Application) 
+        // untuk menghindari error casting "null cannot be cast to Context"
+        Firebase.initialize(Application(), options)
+        
+        isFirebaseInitialized = true
+        println("INFO: Firebase Desktop initialized successfully.")
+    } catch (e: Exception) {
+        if (e.message?.contains("already exists") == true || e.message?.contains("initialized") == true) {
+            isFirebaseInitialized = true
+            println("INFO: Firebase already initialized.")
+        } else {
+            println("ERROR: Firebase Desktop init failed: ${e.message}")
+            e.printStackTrace()
+        }
+    }
 }

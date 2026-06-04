@@ -25,3 +25,7 @@ actual fun formatEpochToDate(millis: Long): String {
     val sdf = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID"))
     return sdf.format(Date(millis))
 }
+
+actual fun initFirebase() {
+    // Di Android sudah otomatis via google-services.json
+}

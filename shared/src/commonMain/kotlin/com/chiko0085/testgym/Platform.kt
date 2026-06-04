@@ -11,3 +11,5 @@ expect fun openWebLink(url: String)
 expect fun getCurrentTimeMillis(): Long
 
 expect fun formatEpochToDate(millis: Long): String
+
+expect fun initFirebase()

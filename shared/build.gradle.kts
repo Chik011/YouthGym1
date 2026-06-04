@@ -40,6 +40,8 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
+            implementation(project.dependencies.platform(libs.firebase.bom))
+            implementation(libs.google.firebase.common.ktx)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -54,9 +56,8 @@ kotlin {
             implementation("com.russhwolf:multiplatform-settings:1.1.1")
             implementation("com.russhwolf:multiplatform-settings-no-arg:1.1.1")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-            implementation("io.github.jan-tennert.supabase:postgrest-kt:2.5.0")
-            implementation("io.ktor:ktor-client-core:2.3.11")
-            implementation("io.ktor:ktor-client-cio:2.3.11")
+            api(libs.firebase.firestore)
+            api(libs.firebase.common)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -66,4 +67,11 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+}
+
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("android.arch.lifecycle:common")).using(module("androidx.lifecycle:lifecycle-common:2.8.4"))
+        substitute(module("android.arch.lifecycle:runtime")).using(module("androidx.lifecycle:lifecycle-runtime:2.8.4"))
+    }
 }

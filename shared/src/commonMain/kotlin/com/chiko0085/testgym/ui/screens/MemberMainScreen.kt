@@ -69,7 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.Trainer
 import com.chiko0085.testgym.openWebLink
-import com.chiko0085.testgym.supabase
+import com.chiko0085.testgym.db
 // Pastikan package warna sesuai dengan lokasimu
 import com.chiko0085.testgym.ui.theme.AccentBlue
 import com.chiko0085.testgym.ui.theme.AccentBlueDark
@@ -77,7 +77,6 @@ import com.chiko0085.testgym.ui.theme.CardDark
 import com.chiko0085.testgym.ui.theme.DarkBgEnd
 import com.chiko0085.testgym.ui.theme.DarkBgStart
 import com.chiko0085.testgym.ui.theme.TextSub
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 import kotlin.math.pow
 import kotlin.math.round
@@ -173,10 +172,11 @@ fun MemberHomeScreen(member: Member) {
     // Member aktif jika kuota > 0 DAN hari di kalender > 0
     val isActive = member.remainingDays > 0 && calendarDaysLeft > 0
 
-    // Menarik data Trainer langsung dari Supabase
+    // Menarik data Trainer langsung dari Firebase
     LaunchedEffect(Unit) {
         try {
-            val dbTrainers = supabase.postgrest["trainers"].select().decodeList<Trainer>()
+            val trainersSnapshot = db.collection("trainers").get()
+            val dbTrainers = trainersSnapshot.documents.map { it.data<Trainer>() }
             trainers.clear()
             trainers.addAll(dbTrainers)
         } catch (e: Exception) { println("Gagal ambil data trainer: ${e.message}") }
@@ -518,7 +518,7 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
                 val updatedMember = member.copy(name = name, weight = updatedWeight, height = updatedHeight)
                 scope.launch {
                     try {
-                        supabase.postgrest["members"].update(updatedMember) { filter { eq("id", member.id) } }
+                        db.collection("members").document(member.id).set(updatedMember)
                         member.name = name; member.weight = updatedWeight; member.height = updatedHeight
                     } catch (_: Exception) {}
                 }

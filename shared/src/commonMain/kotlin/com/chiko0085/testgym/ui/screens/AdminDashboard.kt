@@ -1,63 +1,18 @@
 package com.chiko0085.testgym.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,272 +21,141 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.chiko0085.testgym.exportToExcel
+import com.chiko0085.testgym.db
+import com.chiko0085.testgym.formatEpochToDate
+import com.chiko0085.testgym.getCurrentTimeMillis
 import com.chiko0085.testgym.model.GymPackage
 import com.chiko0085.testgym.model.Member
-import com.chiko0085.testgym.Trainer
-import com.chiko0085.testgym.supabase
-import com.chiko0085.testgym.ui.theme.AccentBlue
-import com.chiko0085.testgym.ui.theme.AccentBlueDark
-import com.chiko0085.testgym.ui.theme.CardDark
-import com.chiko0085.testgym.ui.theme.DarkBgEnd
-import com.chiko0085.testgym.ui.theme.DarkBgStart
-import io.github.jan.supabase.postgrest.postgrest
+import com.chiko0085.testgym.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import com.chiko0085.testgym.Trainer
 
-fun formatRupiah(amount: Double): String {
-    val str = amount.toLong().toString()
-    return str.reversed().chunked(3).joinToString(".").reversed()
-}
+// Primary Colors dari Theme
+val DarkBgStart = Color(0xFF0F172A)
+val DarkBgEnd = Color(0xFF1E293B)
+val CardDark = Color(0xFF1E293B)
+val AccentBlue = Color(0xFF3B82F6)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboard(
     members: MutableList<Member>,
-    gymPackages: MutableList<GymPackage>,
+    gymPackages: SnapshotStateList<GymPackage>,
     totalRevenue: Double,
     onUpdateRevenue: (Double) -> Unit,
     onLogout: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-
+    var searchQuery by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf("dashboard") }
+    
+    // --- STATE UNTUK EDIT & HAPUS ---
     var memberToEdit by remember { mutableStateOf<Member?>(null) }
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
-    var memberToCheckIn by remember { mutableStateOf<Member?>(null) }
-    var showExportSuccess by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
 
-    var showPackageList by remember { mutableStateOf(false) }
-    var showTrainerList by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val filteredMembers = members.filter { it.name.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery) }
 
-    val bgGradient = Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd))
-
-    Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
-        if (showTrainerList) {
-            TrainerManagementScreen(onBack = { showTrainerList = false })
-        } else if (showPackageList) {
-            PackageManagementScreen(packages = gymPackages, onBack = { showPackageList = false })
-        } else {
-            Scaffold(
-                containerColor = Color.Transparent, // Biarkan transparan agar Box background terlihat
-                topBar = {
-                    TopAppBar(
-                        title = { Text("Admin Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            actionIconContentColor = AccentBlue
-                        ),
-                        actions = {
-                            IconButton(onClick = {
-                                val htmlContent = buildString {
-                                    append("""
-                                    <html xmlns:o="urn:schemas-microsoft-com:office:office"
-                                          xmlns:x="urn:schemas-microsoft-com:office:excel"
-                                          xmlns="http://www.w3.org/TR/REC-html40">
-                                    <head>
-                                        <meta charset="utf-8">
-                                        <style>
-                                            table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
-                                            th { background-color: #3B82F6; color: white; border: 1px solid #000000; padding: 12px; font-weight: bold; text-align: center; }
-                                            td { border: 1px solid #000000; padding: 8px; text-align: left; vertical-align: middle; }
-                                            .center-text { text-align: center; }
-                                            .title { font-size: 24px; font-weight: bold; color: #333333; margin-bottom: 20px; }
-                                        </style>
-                                    </head>
-                                    <body>
-                                        <div class="title">Laporan Data Member - Youth Gym</div>
-                                        <table>
-                                            <tr>
-                                                <th>ID Member</th>
-                                                <th>Nama Lengkap</th>
-                                                <th>Username</th>
-                                                <th>Sisa Kuota (Hari)</th>
-                                                <th>Berat Badan (kg)</th>
-                                                <th>Tinggi Badan (cm)</th>
-                                            </tr>
-                                    """.trimIndent())
-                                    members.forEach { member ->
-                                        append("""
-                                            <tr>
-                                                <td class="center-text">${member.id}</td>
-                                                <td>${member.name}</td>
-                                                <td>${member.username}</td>
-                                                <td class="center-text"><b>${member.remainingDays}</b></td>
-                                                <td class="center-text">${member.weight}</td>
-                                                <td class="center-text">${member.height}</td>
-                                            </tr>
-                                        """.trimIndent())
-                                    }
-                                    append("""
-                                        </table>
-                                    </body>
-                                    </html>
-                                    """.trimIndent())
-                                }
-                                exportToExcel(htmlContent)
-                                showExportSuccess = true
-                            }) {
-                                Icon(Icons.Default.Download, contentDescription = "Export Excel")
-                            }
-                            IconButton(onClick = { showTrainerList = true }) {
-                                Icon(Icons.Default.Face, contentDescription = "Trainer")
-                            }
-                            IconButton(onClick = { showPackageList = true }) {
-                                Icon(Icons.Default.List, contentDescription = "Packages")
-                            }
-                        }
-                    )
-                },
-                floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = { showAddDialog = true },
-                        containerColor = AccentBlue,
-                        contentColor = Color.White
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Tambah Member")
-                    }
-                }
-            ) { padding ->
-                Column(
-                    modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)
-                ) {
-                    // Revenue Card - Gradien Biru
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.cardElevation(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Brush.linearGradient(listOf(AccentBlueDark, AccentBlue)))
-                                .padding(24.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(40.dp), tint = Color.White)
-                                Spacer(modifier = Modifier.width(16.dp))
+    // Logic Switch Screen
+    when (currentScreen) {
+        "packages" -> PackageManagementScreen(gymPackages, onBack = { currentScreen = "dashboard" })
+        "trainers" -> TrainerManagementScreen(onBack = { currentScreen = "dashboard" })
+        else -> {
+            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
+                Scaffold(
+                    containerColor = Color.Transparent,
+                    topBar = {
+                        TopAppBar(
+                            title = {
                                 Column {
-                                    Text("Total Pendapatan", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.8f))
-                                    Text("Rp ${formatRupiah(totalRevenue)}", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                    Text("Admin Panel", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                    Text("Youth Gym Management", fontSize = 12.sp, color = Color.LightGray)
                                 }
+                            },
+                            actions = {
+                                IconButton(onClick = { currentScreen = "packages" }) { Icon(Icons.AutoMirrored.Filled.List, "Paket", tint = Color.White) }
+                                IconButton(onClick = { currentScreen = "trainers" }) { Icon(Icons.Default.Person, "Trainer", tint = Color.White) }
+                                IconButton(onClick = onLogout) { Icon(Icons.Default.ExitToApp, "Logout", tint = Color(0xFFF87171)) }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                        )
+                    },
+                    floatingActionButton = {
+                        FloatingActionButton(onClick = { showAddDialog = true }, containerColor = AccentBlue, shape = CircleShape) {
+                            Icon(Icons.Default.Add, "Tambah Member", tint = Color.White)
+                        }
+                    }
+                ) { padding ->
+                    Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+                        // Card Ringkasan
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = AccentBlue.copy(alpha = 0.9f))
+                        ) {
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("Total Revenue", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                                }
+                                Text("Rp ${formatRupiah(totalRevenue)}", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Kotak Pencarian Tema Gelap
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Cari Member...", color = Color.Gray) },
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AccentBlue) },
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = AccentBlue,
-                            unfocusedBorderColor = CardDark,
-                            cursorColor = AccentBlue,
-                            focusedContainerColor = CardDark.copy(alpha = 0.5f),
-                            unfocusedContainerColor = CardDark.copy(alpha = 0.3f)
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text("Daftar Member", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(members.filter { it.name.contains(searchQuery, true) }) { member ->
-                            MemberCard(
-                                member = member,
-                                onCheckIn = { memberToCheckIn = member },
-                                onEdit = { memberToEdit = member },
-                                onDelete = { memberToDelete = member }
+                        // Search Bar
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari Member (Nama/ID)...", color = Color.Gray) },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = AccentBlue) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = CardDark,
+                                unfocusedContainerColor = CardDark,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = Color.Transparent
                             )
+                        )
+
+                        Text("Daftar Member", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
+
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                            items(filteredMembers) { member ->
+                                MemberCard(
+                                    member = member,
+                                    onCheckIn = {
+                                        scope.launch {
+                                            if (member.remainingDays > 0) {
+                                                val updated = member.copy(remainingDays = member.remainingDays - 1)
+                                                val idx = members.indexOfFirst { it.id == member.id }
+                                                if (idx != -1) members[idx] = updated
+                                                // Simpan perubahan ke Cloud
+                                                try {
+                                                    val data = mapOf("remainingDays" to updated.remainingDays)
+                                                    db.collection("members").document(updated.id).update(data)
+                                                } catch (e: Exception) { println("DEBUG: Update Cloud gagal: ${e.message}") }
+                                            }
+                                        }
+                                    },
+                                    onEdit = { memberToEdit = member },
+                                    onDelete = { memberToDelete = member }
+                                )
+                            }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = onLogout,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                    ) {
-                        Text("Logout", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
         }
     }
 
-    // --- DIALOG NOTIFIKASI EXPORT ---
-    if (showExportSuccess) {
-        AlertDialog(
-            onDismissRequest = { showExportSuccess = false },
-            title = { Text("Ekspor Berhasil", fontWeight = FontWeight.Bold, color = AccentBlue) },
-            text = { Text("Data member berhasil diekspor ke Excel.\nSilakan cek folder Profil / Home di laptop Anda (Laporan_Member_YouthGym.xls).") },
-            confirmButton = {
-                Button(
-                    onClick = { showExportSuccess = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                ) { Text("Tutup", color = Color.White) }
-            }
-        )
-    }
-
-    // --- DIALOG CHECK-IN MANUAL ---
-    if (memberToCheckIn != null) {
-        val member = memberToCheckIn!!
-        AlertDialog(
-            onDismissRequest = { memberToCheckIn = null },
-            title = { Text("Check-In Manual", fontWeight = FontWeight.Bold) },
-            text = {
-                if (member.remainingDays > 0) {
-                    Text("Apakah Anda yakin ingin melakukan Check-In untuk ${member.name}? Kuota akan berkurang dari ${member.remainingDays} menjadi ${member.remainingDays - 1}.")
-                } else {
-                    Text("Gagal! Kuota latihan ${member.name} sudah habis (0 Hari). Silakan perpanjang paket.", color = Color.Red)
-                }
-            },
-            confirmButton = {
-                if (member.remainingDays > 0) {
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val updatedMember = member.copy(remainingDays = member.remainingDays - 1)
-                                    supabase.postgrest["members"].update(updatedMember) {
-                                        filter { eq("id", member.id) }
-                                    }
-                                    val idx = members.indexOfFirst { it.id == member.id }
-                                    if (idx != -1) members[idx] = updatedMember
-                                    memberToCheckIn = null
-                                } catch (e: Exception) {
-                                    println("Gagal Check-In: ${e.message}")
-                                }
-                            }
-                        }
-                    ) { Text("Ya, Check-In", color = Color.White) }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { memberToCheckIn = null }) {
-                    Text(if (member.remainingDays > 0) "Batal" else "Tutup", color = Color.Gray)
-                }
-            }
-        )
-    }
-
-    // --- DIALOG CREATE MEMBER ---
+    // --- DIALOG TAMBAH MEMBER ---
     if (showAddDialog) {
         AddMemberDialog(
             packages = gymPackages,
@@ -339,20 +163,33 @@ fun AdminDashboard(
             onConfirm = { n, u, p, d, price ->
                 scope.launch {
                     try {
-                        // --- LOGIKA BARU: HITUNG TANGGAL OTOMATIS ---
                         val currentTime = com.chiko0085.testgym.getCurrentTimeMillis()
-                        val expirationTime = currentTime + (d * 86400000L) // Sisa hari * 1 Hari dalam milidetik
-
+                        val expirationTime = currentTime + (d * 86400000L) 
                         val randomId = "CH-" + Random.nextInt(1000, 9999).toString()
-
-                        // Memasukkan joinDate dan expiredDate
                         val newMember = Member(randomId, n, u, p, d, currentTime, expirationTime, 0.0, 0.0)
 
-                        supabase.postgrest["members"].insert(newMember)
+                        // Update Lokal
                         members.add(newMember)
                         onUpdateRevenue(totalRevenue + price)
                         showAddDialog = false
-                    } catch (e: Exception) { println("Gagal tambah member: ${e.message}") }
+                        
+                        // Update Cloud - Pakai Map agar aman di Desktop
+                        val data = mapOf(
+                            "id" to randomId,
+                            "name" to n,
+                            "username" to u,
+                            "password" to p,
+                            "remainingDays" to d,
+                            "joinDate" to currentTime,
+                            "expiredDate" to expirationTime,
+                            "weight" to 0.0,
+                            "height" to 0.0
+                        )
+                        db.collection("members").document(randomId).set(data)
+                        println("DEBUG: Member baru berhasil disimpan ke Cloud")
+                    } catch (e: Exception) { 
+                        println("WARNING: Member hanya tersimpan lokal karena error Cloud: ${e.message}") 
+                    }
                 }
             }
         )
@@ -366,11 +203,25 @@ fun AdminDashboard(
             onConfirm = { updated ->
                 scope.launch {
                     try {
-                        supabase.postgrest["members"].update(updated) { filter { eq("id", updated.id) } }
+                        // Update Lokal
                         val idx = members.indexOfFirst { it.id == updated.id }
                         if (idx != -1) members[idx] = updated
                         memberToEdit = null
-                    } catch (e: Exception) { println("Gagal update member: ${e.message}") }
+                        
+                        // Update Cloud - Pakai Map
+                        val data = mapOf(
+                            "id" to updated.id,
+                            "name" to updated.name,
+                            "username" to updated.username,
+                            "password" to updated.password,
+                            "remainingDays" to updated.remainingDays,
+                            "joinDate" to updated.joinDate,
+                            "expiredDate" to updated.expiredDate,
+                            "weight" to updated.weight,
+                            "height" to updated.height
+                        )
+                        db.collection("members").document(updated.id).set(data)
+                    } catch (e: Exception) { println("WARNING: Gagal update ke Cloud: ${e.message}") }
                 }
             }
         )
@@ -386,10 +237,14 @@ fun AdminDashboard(
                 TextButton(onClick = {
                     scope.launch {
                         try {
-                            supabase.postgrest["members"].delete { filter { eq("id", memberToDelete?.id!!) } }
-                            members.removeAll { it.id == memberToDelete?.id }
+                            val idToRemove = memberToDelete?.id!!
+                            // Update Lokal
+                            members.removeAll { it.id == idToRemove }
                             memberToDelete = null
-                        } catch (e: Exception) { println("Gagal hapus member: ${e.message}") }
+                            
+                            // Update Cloud
+                            db.collection("members").document(idToRemove).delete()
+                        } catch (e: Exception) { println("WARNING: Gagal hapus dari Cloud: ${e.message}") }
                     }
                 }) { Text("Hapus", color = Color.Red, fontWeight = FontWeight.Bold) }
             },
@@ -537,7 +392,7 @@ fun EditMemberDialog(member: Member, onDismiss: () -> Unit, onConfirm: (Member) 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PackageManagementScreen(packages: MutableList<GymPackage>, onBack: () -> Unit) {
+fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var packageToEdit by remember { mutableStateOf<GymPackage?>(null) }
     var showAddPackage by remember { mutableStateOf(false) }
@@ -577,9 +432,17 @@ fun PackageManagementScreen(packages: MutableList<GymPackage>, onBack: () -> Uni
                             IconButton(onClick = {
                                 scope.launch {
                                     try {
-                                        supabase.postgrest["gym_packages"].delete { filter { eq("id", pkg.id) } }
+                                        val idToRemove = pkg.id
+                                        // Hapus Lokal
                                         packages.remove(pkg)
-                                    } catch (e: Exception) {}
+                                        
+                                        // Hapus Cloud
+                                        db.collection("gym_packages").document(idToRemove).delete()
+                                        println("DEBUG: Berhasil hapus paket ${pkg.name} dari cloud")
+                                    } catch (e: Exception) {
+                                        println("ERROR: Gagal hapus paket dari cloud: ${e.message}")
+                                        e.printStackTrace()
+                                    }
                                 }
                             }) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171)) }
                         }
@@ -598,10 +461,23 @@ fun PackageManagementScreen(packages: MutableList<GymPackage>, onBack: () -> Uni
                     try {
                         val randomId = Random.nextInt(100000, 999999).toString()
                         val newPkg = GymPackage(randomId, n, p, d)
-                        supabase.postgrest["gym_packages"].insert(newPkg)
+                        
+                        // Tambah ke list lokal dulu agar UI update
                         packages.add(newPkg)
                         showAddPackage = false
-                    } catch (e: Exception) {}
+
+                        // Coba simpan ke Cloud
+                        val data = mapOf(
+                            "id" to randomId,
+                            "name" to n,
+                            "price" to p,
+                            "durationDays" to d
+                        )
+                        db.collection("gym_packages").document(randomId).set(data)
+                        println("DEBUG: Berhasil simpan paket ke Cloud")
+                    } catch (e: Exception) {
+                        println("WARNING: Gagal simpan ke Cloud, tapi list lokal terupdate: ${e.message}")
+                    }
                 }
             }
         )
@@ -616,11 +492,23 @@ fun PackageManagementScreen(packages: MutableList<GymPackage>, onBack: () -> Uni
                 scope.launch {
                     try {
                         val updatedPkg = packageToEdit!!.copy(name = n, price = p, durationDays = d)
-                        supabase.postgrest["gym_packages"].update(updatedPkg) { filter { eq("id", updatedPkg.id) } }
+                        
+                        // Update lokal
                         val idx = packages.indexOfFirst { it.id == updatedPkg.id }
                         if (idx != -1) packages[idx] = updatedPkg
                         packageToEdit = null
-                    } catch (e: Exception) {}
+
+                        // Update Cloud
+                        val data = mapOf(
+                            "id" to updatedPkg.id,
+                            "name" to n,
+                            "price" to p,
+                            "durationDays" to d
+                        )
+                        db.collection("gym_packages").document(updatedPkg.id).set(data)
+                    } catch (e: Exception) {
+                        println("WARNING: Gagal update ke Cloud: ${e.message}")
+                    }
                 }
             }
         )
@@ -630,7 +518,7 @@ fun PackageManagementScreen(packages: MutableList<GymPackage>, onBack: () -> Uni
 @Composable
 fun PackageDialog(title: String, initialPackage: GymPackage? = null, onDismiss: () -> Unit, onConfirm: (String, Double, Int) -> Unit) {
     var name by remember { mutableStateOf(initialPackage?.name ?: "") }
-    var price by remember { mutableStateOf(initialPackage?.price?.toString() ?: "") }
+    var price by remember { mutableStateOf(initialPackage?.price?.toLong()?.toString() ?: "") }
     var days by remember { mutableStateOf(initialPackage?.durationDays?.toString() ?: "") }
 
     AlertDialog(
@@ -638,15 +526,44 @@ fun PackageDialog(title: String, initialPackage: GymPackage? = null, onDismiss: 
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Paket") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga (Rp)") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Durasi (Hari)") }, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(
+                    value = name, 
+                    onValueChange = { name = it }, 
+                    label = { Text("Nama Paket") }, 
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = price, 
+                    onValueChange = { price = it }, 
+                    label = { Text("Harga (Angka saja)") }, 
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = days, 
+                    onValueChange = { days = it }, 
+                    label = { Text("Durasi (Hari)") }, 
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, price.toDoubleOrNull() ?: 0.0, days.toIntOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Simpan", color = Color.White) }
+            Button(
+                onClick = {
+                    val p = price.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+                    val d = days.filter { it.isDigit() }.toIntOrNull() ?: 0
+                    if (name.isNotBlank()) {
+                        onConfirm(name, p, d)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text("Simpan", color = Color.White) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+        dismissButton = { 
+            TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } 
+        }
     )
 }
 
@@ -660,7 +577,7 @@ fun TrainerManagementScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         try {
-            val dbTrainers = supabase.postgrest["trainers"].select().decodeList<Trainer>()
+            val dbTrainers = db.collection("trainers").get().documents.map { it.data<Trainer>() }
             trainers.clear()
             trainers.addAll(dbTrainers)
         } catch (e: Exception) {}
@@ -694,8 +611,9 @@ fun TrainerManagementScreen(onBack: () -> Unit) {
                             IconButton(onClick = {
                                 scope.launch {
                                     try {
-                                        supabase.postgrest["trainers"].delete { filter { eq("id", trainer.id) } }
+                                        val idToRemove = trainer.id
                                         trainers.remove(trainer)
+                                        db.collection("trainers").document(idToRemove).delete()
                                     } catch (e: Exception) {}
                                 }
                             }) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171)) }
@@ -712,9 +630,23 @@ fun TrainerManagementScreen(onBack: () -> Unit) {
                 try {
                     val newId = "PT-" + Random.nextInt(100, 999).toString()
                     val newTrainer = Trainer(newId, n, u, p, s, e, r, d)
-                    supabase.postgrest["trainers"].insert(newTrainer)
+                    
+                    // Lokal
                     trainers.add(newTrainer)
                     showAddTrainer = false
+                    
+                    // Cloud
+                    val data = mapOf(
+                        "id" to newId,
+                        "name" to n,
+                        "username" to u,
+                        "password" to p,
+                        "specialization" to s,
+                        "experience" to e,
+                        "rate" to r,
+                        "description" to d
+                    )
+                    db.collection("trainers").document(newId).set(data)
                 } catch (ex: Exception) {}
             }
         })
@@ -750,4 +682,19 @@ fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String, Str
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
     )
+}
+
+fun formatRupiah(amount: Double): String {
+    val str = amount.toLong().toString()
+    var result = ""
+    var count = 0
+    for (i in str.length - 1 downTo 0) {
+        result = str[i] + result
+        count++
+        if (count == 3 && i > 0) {
+            result = "." + result
+            count = 0
+        }
+    }
+    return result
 }

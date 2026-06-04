@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "713442868886",
+    "project_id": "youth-gym",
+    "storage_bucket": "youth-gym.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:713442868886:android:40c655c252db2fda9bccb7",
+        "android_client_info": {
+          "package_name": "com.chiko0085.testgym"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvGwpy_N4ZgEPfiPaUdvreCbcnrgpK-CE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -14,3 +14,7 @@ actual fun openWebLink(url: String) {
 }
 
 actual fun getCurrentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000).toLong()
+
+actual fun formatEpochToDate(millis: Long): String = ""
+
+actual fun initFirebase() { }
