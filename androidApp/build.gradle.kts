@@ -10,6 +10,10 @@ plugins {
 kotlin {
 }
 dependencies {
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebaseCommonKtxGoogle)
+    implementation(libs.firebaseFirestoreGoogle)
+
     implementation(projects.shared)
 
     implementation(libs.androidx.activity.compose)
@@ -37,6 +41,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

@@ -14,4 +14,5 @@ data class Trainer(
     @SerialName("rate")
     val rating: Double? = 0.0,
     val description: String,
+    val schedules: List<String> = emptyList()
 )

@@ -26,13 +26,10 @@ import com.chiko0085.testgym.Trainer
 fun TrainerMainScreen(trainer: Trainer, onLogout: () -> Unit) {
     val bgGradient = Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A192F)))
 
-    // Data Dummy Jadwal Melatih (Nanti bisa disambungkan ke database)
-    val schedules = listOf(
-        "Senin, 10:00 WIB - Sesi Bulking dengan Budi",
-        "Senin, 16:00 WIB - Sesi Cardio dengan Siska",
-        "Selasa, 09:00 WIB - Pendampingan Pemula (Riko)",
-        "Rabu, 14:00 WIB - Sesi Powerlifting dengan Andi"
-    )
+    // Mengambil jadwal langsung dari objek trainer yang login
+    val schedules = trainer.schedules.ifEmpty { 
+        listOf("Belum ada jadwal melatih yang ditugaskan oleh admin.") 
+    }
 
     Scaffold(
         containerColor = Color.Transparent,

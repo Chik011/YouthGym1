@@ -1,18 +1,29 @@
 package com.chiko0085.testgym.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
+import org.jetbrains.compose.resources.painterResource
+// Mengimpor resource secara manual (pastikan file gambar ada di src/commonMain/composeResources/drawable/)
+import youthgym.shared.generated.resources.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,24 +41,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,9 +63,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.model.Reservation
 import com.chiko0085.testgym.Trainer
 import com.chiko0085.testgym.openWebLink
 import com.chiko0085.testgym.db
+import dev.gitlive.firebase.firestore.*
 import com.chiko0085.testgym.formatEpochToDate
 import com.chiko0085.testgym.getCurrentTimeMillis
 // Pastikan package warna sesuai dengan lokasimu
@@ -147,8 +145,8 @@ fun MemberMainScreen(
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
                 when (selectedTab) {
                     0 -> MemberHomeScreen(currentMember)
-                    1 -> PadelScreen()
-                    2 -> MemberScanScreen(title = "QR Kehadiran (Mock)")
+                    1 -> PadelScreen(currentMember)
+                    2 -> MemberScanScreen(title = "QR Kehadiran", onResult = { println("DEBUG: Scan Result: $it") })
                     3 -> AboutUsScreen()
                     4 -> MemberProfileScreen(currentMember, onLogout)
                 }
@@ -186,7 +184,7 @@ fun MemberHomeScreen(member: Member) {
 
     if (showTutorialCamera) {
         Box(modifier = Modifier.fillMaxSize()) {
-            MemberScanScreen(title = "QR Code Alat (Tutorial - Mock)")
+            MemberScanScreen(title = "QR Code Alat", onResult = { println("DEBUG: Tutorial Scan Result: $it") })
             IconButton(
                 onClick = { showTutorialCamera = false },
                 modifier = Modifier.padding(16.dp).align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), CircleShape)
@@ -267,7 +265,7 @@ fun MemberHomeScreen(member: Member) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp)) // Menambahkan jarak antar section
 
             // --- CAROUSEL PERSONAL TRAINER ---
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -463,6 +461,27 @@ fun TrainerProfileDialog(trainer: Trainer, onDismiss: () -> Unit, onContact: () 
                 Text("Tentang Coach:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(trainer.description, fontSize = 13.sp, color = Color.LightGray, lineHeight = 20.sp)
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Jadwal Melatih:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue)
+                Spacer(modifier = Modifier.height(8.dp))
+                if (trainer.schedules.isEmpty()) {
+                    Text("Belum ada jadwal publik.", fontSize = 12.sp, color = Color.Gray)
+                } else {
+                    trainer.schedules.forEach { schedule ->
+                        Surface(
+                            modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth(),
+                            color = Color.White.copy(alpha = 0.05f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DateRange, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(schedule, fontSize = 13.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -478,31 +497,125 @@ fun TrainerProfileDialog(trainer: Trainer, onDismiss: () -> Unit, onContact: () 
 
 // --- SCREEN LAINNYA DI TEMA DARK MODE ---
 @Composable
-fun PadelScreen() {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Layanan Padel", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DateRange, null, tint = AccentBlue)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Reservasi Lapangan", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+fun PadelScreen(member: Member) {
+    var selectedDateMillis by remember { mutableStateOf(getCurrentTimeMillis()) }
+    var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedDateMillis) {
+        isLoading = true
+        try {
+            val dateStr = formatEpochToDate(selectedDateMillis).split(" ").take(3).joinToString(" ")
+            val dayStart = com.chiko0085.testgym.parseDateToMillis(dateStr) ?: selectedDateMillis
+            
+            val snapshot = db.collection("reservations")
+                .where("date", equalTo = dayStart)
+                .get()
+            
+            val dbReservations = snapshot.documents.map { it.data<Reservation>() }
+            val fullList = mutableListOf<Reservation>()
+            // Batasi jam buka: 08:00 sampai 00:00 (jam 23 ke 24)
+            for (i in 8..23) {
+                val found = dbReservations.find { it.hour == i }
+                fullList.add(found ?: Reservation(id = "${dayStart}_$i", date = dayStart, hour = i, status = "Empty"))
+            }
+            reservations = fullList
+        } catch (e: Exception) {
+            println("ERROR: Gagal ambil reservasi: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Reservasi Lapangan Padel", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = CardDark)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("Pilih Tanggal", color = TextSub, fontSize = 12.sp)
+                    Text(formatEpochToDate(selectedDateMillis).split(" ").take(3).joinToString(" "), 
+                        color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
-                Text("Booking jadwal main Padel Anda secara real-time.", fontSize = 12.sp, color = TextSub)
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = { /* Logic */ }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Cek Ketersediaan", color = Color.White) }
+                Row {
+                    IconButton(onClick = { selectedDateMillis -= 86400000L }) { 
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) 
+                    }
+                    IconButton(onClick = { selectedDateMillis += 86400000L }) { 
+                        Icon(Icons.Default.ArrowForward, null, tint = Color.White)
+                    }
+                }
             }
         }
-        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ThumbUp, null, tint = AccentBlue)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Penyewaan Alat", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(color = AccentBlue)
+            }
+        } else {
+            androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                items(reservations) { res ->
+                    MemberReservationCard(res, onBook = {
+                        val dateStr = formatEpochToDate(res.date).split(" ").take(3).joinToString(" ")
+                        val hourStr = if (res.hour < 10) "0${res.hour}:00" else "${res.hour}:00"
+                        val message = "Halo Admin Youth Gym, saya ${member.name} ingin booking lapangan Padel untuk tanggal $dateStr jam $hourStr. Apakah masih tersedia?"
+                        
+                        // Encode manual sederhana untuk spasi
+                        val encodedMessage = message.replace(" ", "%20")
+                        openWebLink("https://wa.me/628123456789?text=$encodedMessage")
+                    })
                 }
-                Text("Sewa raket Padel dan bola berkualitas.", fontSize = 12.sp, color = TextSub)
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = { /* Logic */ }, modifier = Modifier.fillMaxWidth()) { Text("Lihat Katalog Alat", color = AccentBlue) }
+            }
+        }
+    }
+}
+
+@Composable
+fun MemberReservationCard(reservation: Reservation, onBook: () -> Unit) {
+    val hourStr = if (reservation.hour < 10) "0${reservation.hour}:00" else "${reservation.hour}:00"
+    val nextHour = if (reservation.hour + 1 < 10) "0${reservation.hour + 1}:00" else "${reservation.hour + 1}:00"
+    val isAvailable = reservation.status == "Empty"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isAvailable) CardDark else CardDark.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("$hourStr - $nextHour", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (isAvailable) "Tersedia" else "Sudah Dipesan",
+                    color = if (isAvailable) Color(0xFF34D399) else Color(0xFFF87171),
+                    fontSize = 12.sp
+                )
+            }
+            
+            if (isAvailable) {
+                Button(
+                    onClick = onBook,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Booking", color = Color.White, fontSize = 12.sp)
+                }
+            } else {
+                Text(reservation.reservedByName, color = Color.Gray, fontSize = 12.sp)
             }
         }
     }
@@ -510,9 +623,14 @@ fun PadelScreen() {
 
 @Composable
 fun AboutUsScreen() {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Text("About Us", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Deskripsi Youth Gym
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text("Youth Gym", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
@@ -520,18 +638,75 @@ fun AboutUsScreen() {
                 Text("Aplikasi Manajemen Fasilitas Olahraga Pintar yang dirancang untuk memudahkan member dalam memantau sisa kuota latihan dan reservasi fasilitas olahraga modern.", color = Color.LightGray, textAlign = TextAlign.Justify)
             }
         }
+
+        // Fasilitas Gym (Gallery)
+        Text("Fasilitas Gym", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth())
+        val gymImages = listOf(
+            Res.drawable.gym1, Res.drawable.gym2, Res.drawable.gym3, Res.drawable.gym4,
+            Res.drawable.gym5, Res.drawable.gym6, Res.drawable.gym7, Res.drawable.gym8
+        )
+        FacilityGallery(images = gymImages)
+
+        // Lapangan Padel (Gallery)
+        Text("Lapangan Padel", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth())
+        val padelImages = listOf(
+            Res.drawable.padel1, Res.drawable.padel2, Res.drawable.padel3, Res.drawable.padel4,
+            Res.drawable.padel5, Res.drawable.padel6, Res.drawable.padel7, Res.drawable.padel8
+        )
+        FacilityGallery(images = padelImages)
+
+        // Lokasi Google Maps
+        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LocationOn, null, tint = Color(0xFFF87171))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Lokasi Kami", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { openWebLink("https://maps.app.goo.gl/1qQr52B4W7vgrKa47") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Place, null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Buka di Google Maps", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MemberScanScreen(title: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(64.dp))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Fitur Kamera dimatikan sementara di mode KMP", color = TextSub, fontSize = 12.sp)
+fun FacilityGallery(images: List<org.jetbrains.compose.resources.DrawableResource>) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start), // Dari kiri ke kanan
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = 4 
+    ) {
+        images.forEach { res ->
+            Card(
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .weight(1f) // Membuat gambar fleksibel mengisi ruang
+                    .widthIn(min = 80.dp, max = 200.dp) // Minimal 80dp (HP), Maksimal 200dp (Laptop/Layar Lebar)
+                    .aspectRatio(1f) // Tetap kotak
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp)), // Tambah border halus
+                colors = CardDefaults.cardColors(containerColor = CardDark)
+            ) {
+                Image(
+                    painter = painterResource(res),
+                    contentDescription = "Facility Image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
     }
 }

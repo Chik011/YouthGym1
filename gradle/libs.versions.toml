@@ -18,6 +18,7 @@ material3 = "1.11.0-alpha07"
 firebase-gitlive = "1.13.0"
 firebase-bom = "34.14.0"
 firebase-common-ktx = "21.0.0"
+firebase-firestore-google = "26.3.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -40,8 +41,10 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 firebase-firestore = { module = "dev.gitlive:firebase-firestore", version.ref = "firebase-gitlive" }
 firebase-common = { module = "dev.gitlive:firebase-common", version.ref = "firebase-gitlive" }
+codescanner = { module = "com.google.android.gms:play-services-code-scanner", version = "16.1.0" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
-google-firebase-common-ktx = { group = "com.google.firebase", name = "firebase-common-ktx", version.ref = "firebase-common-ktx" }
+firebaseCommonKtxGoogle = { group = "com.google.firebase", name = "firebase-common-ktx", version.ref = "firebase-common-ktx" }
+firebaseFirestoreGoogle = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebase-firestore-google" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

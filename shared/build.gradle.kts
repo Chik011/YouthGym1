@@ -41,7 +41,9 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.google.firebase.common.ktx)
+            implementation(libs.firebaseCommonKtxGoogle)
+            implementation(libs.firebaseFirestoreGoogle)
+            implementation(libs.codescanner)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
