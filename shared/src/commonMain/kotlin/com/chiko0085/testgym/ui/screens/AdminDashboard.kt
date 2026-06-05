@@ -3,6 +3,7 @@ package com.chiko0085.testgym.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +28,7 @@ import com.chiko0085.testgym.getCurrentTimeMillis
 import com.chiko0085.testgym.model.GymPackage
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.ui.theme.*
+import com.chiko0085.testgym.exportToExcel
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import com.chiko0085.testgym.Trainer
@@ -42,6 +44,7 @@ val AccentBlue = Color(0xFF3B82F6)
 fun AdminDashboard(
     members: MutableList<Member>,
     gymPackages: SnapshotStateList<GymPackage>,
+    trainers: SnapshotStateList<Trainer>,
     totalRevenue: Double,
     onUpdateRevenue: (Double) -> Unit,
     onLogout: () -> Unit
@@ -53,6 +56,9 @@ fun AdminDashboard(
     // --- STATE UNTUK EDIT & HAPUS ---
     var memberToEdit by remember { mutableStateOf<Member?>(null) }
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
+    var memberToCheckIn by remember { mutableStateOf<Member?>(null) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var snackbarHostState = remember { SnackbarHostState() }
 
     val scope = rememberCoroutineScope()
     val filteredMembers = members.filter { it.name.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery) }
@@ -60,11 +66,12 @@ fun AdminDashboard(
     // Logic Switch Screen
     when (currentScreen) {
         "packages" -> PackageManagementScreen(gymPackages, onBack = { currentScreen = "dashboard" })
-        "trainers" -> TrainerManagementScreen(onBack = { currentScreen = "dashboard" })
+        "trainers" -> TrainerManagementScreen(trainers, onBack = { currentScreen = "dashboard" })
         else -> {
             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
                 Scaffold(
                     containerColor = Color.Transparent,
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
                         TopAppBar(
                             title = {
@@ -74,8 +81,12 @@ fun AdminDashboard(
                                 }
                             },
                             actions = {
-                                IconButton(onClick = { currentScreen = "packages" }) { Icon(Icons.AutoMirrored.Filled.List, "Paket", tint = Color.White) }
-                                IconButton(onClick = { currentScreen = "trainers" }) { Icon(Icons.Default.Person, "Trainer", tint = Color.White) }
+                                TextButton(onClick = { currentScreen = "packages" }) { 
+                                    Text("Manajemen Paket", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) 
+                                }
+                                TextButton(onClick = { currentScreen = "trainers" }) { 
+                                    Text("Personal Trainer", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) 
+                                }
                                 IconButton(onClick = onLogout) { Icon(Icons.Default.ExitToApp, "Logout", tint = Color(0xFFF87171)) }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -102,9 +113,37 @@ fun AdminDashboard(
                                 }
                                 Text("Rp ${formatRupiah(totalRevenue)}", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                                    TextButton(onClick = { showResetDialog = true }) {
+                                        Icon(Icons.Default.Refresh, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Reset Pendapatan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = {
+                                        val html = generateRevenueHtml(members)
+                                        exportToExcel(html)
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Laporan berhasil diunduh ke folder Downloads")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = AccentBlue)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Unduh Laporan Excel (CSV)", color = AccentBlue, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
+
+                        // --- TAMBAHAN: KALENDER MINI ---
+                        CalendarCard()
 
                         // Search Bar
                         OutlinedTextField(
@@ -127,23 +166,16 @@ fun AdminDashboard(
                         Text("Daftar Member", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White, modifier = Modifier.padding(bottom = 12.dp))
 
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                            item {
+                                Text("Personal Trainer Aktif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
+                                TrainerListRow(trainers)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Daftar Member Gym", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
+                            }
                             items(filteredMembers) { member ->
                                 MemberCard(
                                     member = member,
-                                    onCheckIn = {
-                                        scope.launch {
-                                            if (member.remainingDays > 0) {
-                                                val updated = member.copy(remainingDays = member.remainingDays - 1)
-                                                val idx = members.indexOfFirst { it.id == member.id }
-                                                if (idx != -1) members[idx] = updated
-                                                // Simpan perubahan ke Cloud
-                                                try {
-                                                    val data = mapOf("remainingDays" to updated.remainingDays)
-                                                    db.collection("members").document(updated.id).update(data)
-                                                } catch (e: Exception) { println("DEBUG: Update Cloud gagal: ${e.message}") }
-                                            }
-                                        }
-                                    },
+                                    onCheckIn = { memberToCheckIn = member },
                                     onEdit = { memberToEdit = member },
                                     onDelete = { memberToDelete = member }
                                 )
@@ -155,18 +187,88 @@ fun AdminDashboard(
         }
     }
 
+    // --- DIALOG KONFIRMASI RESET PENDAPATAN ---
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Reset Pendapatan?") },
+            text = { Text("Tindakan ini akan menghapus histori pembayaran semua member di database. Member tetap ada, namun nilai pembayaran mereka akan menjadi 0. Lanjutkan?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                members.forEach { member ->
+                                    val updated = member.copy(pricePaid = 0.0)
+                                    db.collection("members").document(member.id).update(mapOf("pricePaid" to 0.0))
+                                    val idx = members.indexOfFirst { it.id == member.id }
+                                    if (idx != -1) members[idx] = updated
+                                }
+                                onUpdateRevenue(0.0)
+                                showResetDialog = false
+                                snackbarHostState.showSnackbar("Pendapatan berhasil direset ke 0")
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("Gagal reset: ${e.message}")
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF87171))
+                ) { Text("Ya, Reset", color = Color.White) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) { Text("Batal", color = Color.Gray) }
+            }
+        )
+    }
+
+    // --- DIALOG KONFIRMASI CHECK-IN ---
+    if (memberToCheckIn != null) {
+        AlertDialog(
+            onDismissRequest = { memberToCheckIn = null },
+            title = { Text("Konfirmasi Check-in") },
+            text = { Text("Apakah Anda yakin ingin melakukan check-in untuk ${memberToCheckIn?.name}? Sisa hari akan berkurang 1.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val member = memberToCheckIn!!
+                        scope.launch {
+                            if (member.remainingDays > 0) {
+                                val updated = member.copy(remainingDays = member.remainingDays - 1)
+                                val idx = members.indexOfFirst { it.id == member.id }
+                                if (idx != -1) members[idx] = updated
+                                try {
+                                    val data = mapOf("remainingDays" to updated.remainingDays)
+                                    db.collection("members").document(updated.id).update(data)
+                                    snackbarHostState.showSnackbar("Check-in berhasil untuk ${member.name}")
+                                } catch (e: Exception) { 
+                                    println("DEBUG: Update Cloud gagal: ${e.message}") 
+                                }
+                            } else {
+                                snackbarHostState.showSnackbar("Gagal: Sisa hari sudah habis!")
+                            }
+                            memberToCheckIn = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) { Text("Ya, Check-in", color = Color.White) }
+            },
+            dismissButton = {
+                TextButton(onClick = { memberToCheckIn = null }) { Text("Batal", color = Color.Gray) }
+            }
+        )
+    }
+
     // --- DIALOG TAMBAH MEMBER ---
     if (showAddDialog) {
         AddMemberDialog(
             packages = gymPackages,
             onDismiss = { showAddDialog = false },
-            onConfirm = { n, u, p, d, price ->
+            onConfirm = { n, u, p, d, price, joinDate, pkgName ->
                 scope.launch {
                     try {
-                        val currentTime = com.chiko0085.testgym.getCurrentTimeMillis()
-                        val expirationTime = currentTime + (d * 86400000L) 
+                        val expirationTime = joinDate + (d * 86400000L) 
                         val randomId = "CH-" + Random.nextInt(1000, 9999).toString()
-                        val newMember = Member(randomId, n, u, p, d, currentTime, expirationTime, 0.0, 0.0)
+                        val newMember = Member(randomId, n, u, p, d, joinDate, expirationTime, 0.0, 0.0, price, pkgName)
 
                         // Update Lokal
                         members.add(newMember)
@@ -180,10 +282,12 @@ fun AdminDashboard(
                             "username" to u,
                             "password" to p,
                             "remainingDays" to d,
-                            "joinDate" to currentTime,
+                            "joinDate" to joinDate,
                             "expiredDate" to expirationTime,
                             "weight" to 0.0,
-                            "height" to 0.0
+                            "height" to 0.0,
+                            "pricePaid" to price,
+                            "packageName" to pkgName
                         )
                         db.collection("members").document(randomId).set(data)
                         println("DEBUG: Member baru berhasil disimpan ke Cloud")
@@ -303,7 +407,15 @@ fun MemberCard(member: Member, onCheckIn: () -> Unit, onEdit: () -> Unit, onDele
                     )
                 }
             }
-            IconButton(onClick = onCheckIn) { Icon(Icons.Default.CheckCircle, contentDescription = "Check-in", tint = Color(0xFF34D399)) }
+            Button(
+                onClick = onCheckIn,
+                modifier = Modifier.padding(start = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981).copy(alpha = 0.1f)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Check-in Manual", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
             IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.LightGray) }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFF87171)) }
         }
@@ -312,7 +424,7 @@ fun MemberCard(member: Member, onCheckIn: () -> Unit, onEdit: () -> Unit, onDele
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm: (String, String, String, Int, Double) -> Unit) {
+fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm: (String, String, String, Int, Double, Long, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
@@ -320,6 +432,11 @@ fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm
     var selectedPrice by remember { mutableDoubleStateOf(0.0) }
     var expanded by remember { mutableStateOf(false) }
     var selectedPackageName by remember { mutableStateOf("Pilih Paket (Opsional)") }
+    
+    // Default join date adalah hari ini (WIB)
+    val now = com.chiko0085.testgym.getCurrentTimeMillis()
+    val fullDate = com.chiko0085.testgym.formatEpochToDate(now) // "dd MMMM yyyy HH:mm"
+    var joinDateStr by remember { mutableStateOf(fullDate.split(" ").take(3).joinToString(" ")) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -338,11 +455,11 @@ fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         packages.forEach { pkg ->
                             DropdownMenuItem(
-                                text = { Text("${pkg.name} - Rp ${formatRupiah(pkg.price)}") },
+                                text = { Text("${pkg.name} - Rp ${formatRupiah(pkg.price ?: 0.0)}") },
                                 onClick = {
                                     selectedPackageName = pkg.name
                                     days = pkg.durationDays.toString()
-                                    selectedPrice = pkg.price
+                                    selectedPrice = pkg.price ?: 0.0
                                     expanded = false
                                 }
                             )
@@ -350,11 +467,15 @@ fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm
                     }
                 }
                 OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Masa Aktif (Hari)") }, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = joinDateStr, onValueChange = { joinDateStr = it }, label = { Text("Tgl Daftar (Cth: 10 Juni 2026)") }, shape = RoundedCornerShape(12.dp), placeholder = { Text("10 Juni 2026") })
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(name, user, pass, days.toIntOrNull() ?: 0, selectedPrice) },
+                onClick = { 
+                    val millis = parseDateToMillis(joinDateStr) ?: com.chiko0085.testgym.getCurrentTimeMillis()
+                    onConfirm(name, user, pass, days.toIntOrNull() ?: 0, selectedPrice, millis, selectedPackageName) 
+                },
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) { Text("Simpan Member", fontWeight = FontWeight.Bold, color = Color.White) }
@@ -369,6 +490,9 @@ fun EditMemberDialog(member: Member, onDismiss: () -> Unit, onConfirm: (Member) 
     var user by remember { mutableStateOf(member.username) }
     var pass by remember { mutableStateOf(member.password) }
     var days by remember { mutableStateOf(member.remainingDays.toString()) }
+    val fullDate = com.chiko0085.testgym.formatEpochToDate(member.joinDate)
+    var joinDateStr by remember { mutableStateOf(fullDate.split(" ").take(3).joinToString(" ")) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit Data Member", fontWeight = FontWeight.Bold) },
@@ -378,11 +502,17 @@ fun EditMemberDialog(member: Member, onDismiss: () -> Unit, onConfirm: (Member) 
                 OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp))
                 OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp))
                 OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Sisa Hari") }, shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = joinDateStr, onValueChange = { joinDateStr = it }, label = { Text("Tgl Daftar (Cth: 10 Juni 2026)") }, shape = RoundedCornerShape(12.dp))
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(member.copy(name=name, username=user, password=pass, remainingDays=days.toIntOrNull()?:0)) },
+                onClick = { 
+                    val newJoin = parseDateToMillis(joinDateStr) ?: member.joinDate
+                    val d = days.toIntOrNull() ?: 0
+                    val newExp = newJoin + (d * 86400000L)
+                    onConfirm(member.copy(name=name, username=user, password=pass, remainingDays=d, joinDate=newJoin, expiredDate=newExp)) 
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) { Text("Update", color = Color.White) }
         },
@@ -425,7 +555,7 @@ fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () 
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(pkg.name, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
-                                Text("Harga: Rp ${formatRupiah(pkg.price)}", color = AccentBlue, fontWeight = FontWeight.Bold)
+                                Text("Harga: Rp ${formatRupiah(pkg.price ?: 0.0)}", color = AccentBlue, fontWeight = FontWeight.Bold)
                                 Text("Durasi: ${pkg.durationDays} Hari", fontSize = 14.sp, color = Color.LightGray)
                             }
                             IconButton(onClick = { packageToEdit = pkg }) { Icon(Icons.Default.Edit, null, tint = Color.LightGray) }
@@ -570,18 +700,9 @@ fun PackageDialog(title: String, initialPackage: GymPackage? = null, onDismiss: 
 // --- FUNGSI MANAJEMEN TRAINER ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrainerManagementScreen(onBack: () -> Unit) {
+fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val trainers = remember { mutableStateListOf<Trainer>() }
     var showAddTrainer by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        try {
-            val dbTrainers = db.collection("trainers").get().documents.map { it.data<Trainer>() }
-            trainers.clear()
-            trainers.addAll(dbTrainers)
-        } catch (e: Exception) {}
-    }
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
         Scaffold(
@@ -625,10 +746,14 @@ fun TrainerManagementScreen(onBack: () -> Unit) {
     }
 
     if (showAddTrainer) {
-        TrainerDialog(onDismiss = { showAddTrainer = false }, onConfirm = { n, u, p, s, e, r, d ->
+        TrainerDialog(onDismiss = { showAddTrainer = false }, onConfirm = { n, u, p ->
             scope.launch {
                 try {
                     val newId = "PT-" + Random.nextInt(100, 999).toString()
+                    val s = "Personal Trainer" // Default specialization
+                    val e = "1 Tahun" // Default experience
+                    val r = 5.0 // Default rate
+                    val d = "Trainer di Youth Gym" // Default description
                     val newTrainer = Trainer(newId, n, u, p, s, e, r, d)
                     
                     // Lokal
@@ -654,31 +779,27 @@ fun TrainerManagementScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String, String, String, Double, String) -> Unit) {
+fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
-    var spec by remember { mutableStateOf("") }
-    var exp by remember { mutableStateOf("") }
-    var rate by remember { mutableStateOf("") }
-    var desc by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Tambah Akun Trainer", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") })
-                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") })
-                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") })
-                OutlinedTextField(value = spec, onValueChange = { spec = it }, label = { Text("Spesialisasi (Cth: Cardio)") })
-                OutlinedTextField(value = exp, onValueChange = { exp = it }, label = { Text("Pengalaman (Cth: 5 Tahun)") })
-                OutlinedTextField(value = rate, onValueChange = { rate = it }, label = { Text("Rating (Cth: 4.8)") })
-                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Deskripsi Singkat") })
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, user, pass, spec, exp, rate.toDoubleOrNull() ?: 5.0, desc) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Simpan", color = Color.White) }
+            Button(
+                onClick = { if (name.isNotBlank() && user.isNotBlank()) onConfirm(name, user, pass) }, 
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                shape = RoundedCornerShape(8.dp)
+            ) { Text("Simpan", color = Color.White) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
     )
@@ -697,4 +818,148 @@ fun formatRupiah(amount: Double): String {
         }
     }
     return result
+}
+
+@Composable
+fun TrainerListRow(trainers: SnapshotStateList<Trainer>) {
+    if (trainers.isEmpty()) {
+        Text("Belum ada trainer terdaftar", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+    } else {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            items(trainers) { trainer ->
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardDark),
+                    modifier = Modifier.width(140.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = AccentBlue.copy(alpha = 0.2f)) {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(trainer.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1)
+                        Text("Trainer", fontSize = 10.sp, color = Color.Gray)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CalendarCard() {
+    val now = com.chiko0085.testgym.getCurrentTimeMillis()
+    val dateStr = com.chiko0085.testgym.formatEpochToDate(now) // "dd MMMM yyyy HH:mm"
+    val parts = dateStr.split(" ")
+    val day = parts.getOrNull(0) ?: ""
+    val month = parts.getOrNull(1) ?: ""
+    val year = parts.getOrNull(2) ?: ""
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardDark)
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tampilan Ikon Kalender Bergaya
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AccentBlue.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(month.take(3).uppercase(), color = AccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(day, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column {
+                Text("Hari Ini", color = Color.Gray, fontSize = 12.sp)
+                Text("$day $month $year", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Waktu Indonesia Barat (WIB)", color = AccentBlue.copy(alpha = 0.8f), fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+fun generateRevenueHtml(members: List<Member>): String {
+    val sortedMembers = members.sortedBy { it.joinDate }
+    var cumulativeRevenue = 0.0
+    
+    val htmlBuilder = StringBuilder()
+    htmlBuilder.append("""
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+            <style>
+                table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                th { background-color: #3B82F6; color: white; border: 1px solid #ddd; padding: 12px; text-align: left; }
+                td { border: 1px solid #ddd; padding: 10px; }
+                tr:nth-child(even) { background-color: #f2f2f2; }
+                .total-row { background-color: #1E293B; color: white; font-weight: bold; }
+                .header-title { font-size: 24px; color: #3B82F6; font-weight: bold; margin-bottom: 20px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="header-title">LAPORAN PENDAPATAN YOUTH GYM</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>ID Member</th>
+                        <th>Nama Member</th>
+                        <th>Paket</th>
+                        <th>Tanggal Transaksi</th>
+                        <th>Pendapatan</th>
+                        <th>Total Akumulasi</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """.trimIndent())
+
+    sortedMembers.forEachIndexed { index, m ->
+        cumulativeRevenue += (m.pricePaid ?: 0.0)
+        val dateStr = com.chiko0085.testgym.formatEpochToDate(m.joinDate).split(" ").take(3).joinToString(" ")
+        
+        htmlBuilder.append("""
+            <tr>
+                <td>${index + 1}</td>
+                <td>${m.id}</td>
+                <td>${m.name}</td>
+                <td>${m.packageName}</td>
+                <td>$dateStr</td>
+                <td>Rp ${formatRupiah(m.pricePaid ?: 0.0)}</td>
+                <td>Rp ${formatRupiah(cumulativeRevenue)}</td>
+            </tr>
+        """.trimIndent())
+    }
+
+    htmlBuilder.append("""
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="6" style="text-align: right;">TOTAL PENDAPATAN AKHIR</td>
+                        <td>Rp ${formatRupiah(cumulativeRevenue)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </body>
+        </html>
+    """.trimIndent())
+    
+    return htmlBuilder.toString()
+}
+
+fun parseDateToMillis(dateStr: String): Long? {
+    return com.chiko0085.testgym.parseDateToMillis(dateStr)
 }

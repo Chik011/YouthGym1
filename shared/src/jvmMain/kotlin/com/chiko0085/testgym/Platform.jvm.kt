@@ -9,6 +9,8 @@ import dev.gitlive.firebase.FirebaseOptions
 import com.google.firebase.FirebasePlatform
 import android.app.Application
 
+import java.util.TimeZone
+
 class JVMPlatform: Platform {
     override val name: String = "Java ${System.getProperty("java.version")}"
 }
@@ -23,12 +25,42 @@ actual fun openWebLink(url: String) {
     else rt.exec("xdg-open $url")
 }
 
-actual fun getCurrentTimeMillis(): Long = System.currentTimeMillis()
+actual fun getCurrentTimeMillis(): Long {
+    // Mengambil waktu realtime dan memastikan dalam konteks GMT+7 (WIB)
+    val tz = TimeZone.getTimeZone("Asia/Jakarta")
+    val cal = java.util.Calendar.getInstance(tz)
+    return cal.timeInMillis
+}
 
 actual fun formatEpochToDate(millis: Long): String {
     if (millis <= 0L) return "-"
-    val sdf = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID"))
+    val sdf = SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("id", "ID"))
+    sdf.timeZone = TimeZone.getTimeZone("Asia/Jakarta")
     return sdf.format(Date(millis))
+}
+
+actual fun parseDateToMillis(dateStr: String): Long? {
+    return try {
+        val parts = dateStr.trim().split(" ")
+        if (parts.size != 3) return null
+        
+        val day = parts[0].toInt()
+        val monthStr = parts[1].lowercase()
+        val year = parts[2].toInt()
+        
+        val monthIdx = listOf("januari", "februari", "maret", "april", "mei", "juni", 
+                              "juli", "agustus", "september", "oktober", "november", "desember")
+                              .indexOf(monthStr)
+        if (monthIdx == -1) return null
+        
+        val tz = TimeZone.getTimeZone("Asia/Jakarta")
+        val cal = java.util.Calendar.getInstance(tz)
+        cal.set(year, monthIdx, day, 0, 0, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        cal.timeInMillis
+    } catch (e: Exception) {
+        null
+    }
 }
 
 // Global variable untuk menyimpan status inisialisasi agar tidak dipanggil berulang

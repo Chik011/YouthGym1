@@ -12,4 +12,6 @@ expect fun getCurrentTimeMillis(): Long
 
 expect fun formatEpochToDate(millis: Long): String
 
+expect fun parseDateToMillis(dateStr: String): Long?
+
 expect fun initFirebase()

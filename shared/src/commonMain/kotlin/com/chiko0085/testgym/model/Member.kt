@@ -8,9 +8,11 @@ data class Member(
     var name: String,
     var username: String,
     var password: String,
-    var remainingDays: Int,
-    var joinDate: Long = 0L,    // <--- INI TAMBAHANNYA (Untuk menyimpan tanggal daftar)
+    var remainingDays: Int = 0,
+    var joinDate: Long = 0L,
     var expiredDate: Long = 0L,
-    var weight: Double = 0.0,
-    var height: Double = 0.0,
+    var weight: Double? = 0.0,
+    var height: Double? = 0.0,
+    var pricePaid: Double? = 0.0,    // Tambahan untuk laporan keuangan
+    var packageName: String = ""   // Tambahan untuk laporan keuangan
 )

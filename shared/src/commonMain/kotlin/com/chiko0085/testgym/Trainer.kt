@@ -1,6 +1,7 @@
 package com.chiko0085.testgym
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class Trainer(
@@ -10,6 +11,7 @@ data class Trainer(
     val password: String = "",
     val specialization: String,
     val experience: String,
-    val rating: Double,
+    @SerialName("rate")
+    val rating: Double? = 0.0,
     val description: String,
 )

@@ -6,6 +6,6 @@ import kotlinx.serialization.Serializable
 data class GymPackage(
     val id: String,
     var name: String,
-    var price: Double,
-    var durationDays: Int
+    var price: Double? = 0.0,
+    var durationDays: Int = 0
 )

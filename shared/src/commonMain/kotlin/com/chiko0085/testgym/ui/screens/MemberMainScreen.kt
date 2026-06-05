@@ -70,6 +70,8 @@ import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.Trainer
 import com.chiko0085.testgym.openWebLink
 import com.chiko0085.testgym.db
+import com.chiko0085.testgym.formatEpochToDate
+import com.chiko0085.testgym.getCurrentTimeMillis
 // Pastikan package warna sesuai dengan lokasimu
 import com.chiko0085.testgym.ui.theme.AccentBlue
 import com.chiko0085.testgym.ui.theme.AccentBlueDark
@@ -157,8 +159,8 @@ fun MemberMainScreen(
 
 @Composable
 fun MemberHomeScreen(member: Member) {
-    var weightInput by remember { mutableStateOf(if(member.weight > 0) member.weight.toString() else "") }
-    var heightInput by remember { mutableStateOf(if(member.height > 0) member.height.toString() else "") }
+    var weightInput by remember { mutableStateOf(if((member.weight ?: 0.0) > 0) (member.weight?.toString() ?: "") else "") }
+    var heightInput by remember { mutableStateOf(if((member.height ?: 0.0) > 0) (member.height?.toString() ?: "") else "") }
     var showTutorialCamera by remember { mutableStateOf(false) }
 
     var selectedTrainer by remember { mutableStateOf<Trainer?>(null) }
@@ -199,19 +201,38 @@ fun MemberHomeScreen(member: Member) {
             Text(member.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
             Spacer(modifier = Modifier.height(24.dp))
 
+            // --- TAMBAHAN: KALENDER MINI ---
+            MemberCalendarCard()
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // KARTU SISA KUOTA NEON GLOW (DENGAN LOGIKA WAKTU KALENDER)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
-                Box(modifier = Modifier.background(Brush.linearGradient(listOf(AccentBlueDark, AccentBlue))).padding(32.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.background(Brush.linearGradient(listOf(AccentBlueDark, AccentBlue))).padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Sisa Kuota Latihan", color = Color.White.copy(alpha = 0.8f))
                         Text(
                             text = if (isActive) "${member.remainingDays}X" else "HABIS",
                             fontSize = 64.sp, fontWeight = FontWeight.Black, color = Color.White
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // --- INFO TANGGAL DAFTAR & EXPIRED ---
+                        val joinStr = formatEpochToDate(member.joinDate).split(" ").take(3).joinToString(" ")
+                        val expStr = formatEpochToDate(member.expiredDate).split(" ").take(3).joinToString(" ")
+                        
+                        Surface(color = Color.Black.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
+                            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Mulai: $joinStr", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f))
+                                Text("Sampai: $expStr", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = if (isActive) "Berlaku $calendarDaysLeft Hari Lagi" else "Silakan Perpanjang Paket",
                             fontWeight = FontWeight.Bold, color = if (isActive) Color.White else Color(0xFFF87171)
@@ -341,8 +362,51 @@ fun MemberHomeScreen(member: Member) {
         TrainerProfileDialog(
             trainer = selectedTrainer!!,
             onDismiss = { selectedTrainer = null },
-            onContact = { openWebLink("https://wa.me/+628123456789"); selectedTrainer = null }
+            onContact = { 
+                // Menggunakan nomor simulasi atau jika ada field phone di Trainer bisa dipakai
+                openWebLink("https://wa.me/628123456789") 
+                selectedTrainer = null 
+            }
         )
+    }
+}
+
+@Composable
+fun MemberCalendarCard() {
+    val now = getCurrentTimeMillis()
+    val dateStr = formatEpochToDate(now) // "dd MMMM yyyy HH:mm"
+    val parts = dateStr.split(" ")
+    val day = parts.getOrNull(0) ?: ""
+    val month = parts.getOrNull(1) ?: ""
+    val year = parts.getOrNull(2) ?: ""
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardDark)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AccentBlue.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(month.take(3).uppercase(), color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(day, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text("Hari Ini", color = TextSub, fontSize = 11.sp)
+                Text("$day $month $year", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
@@ -476,8 +540,8 @@ fun MemberScanScreen(title: String) {
 fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf(member.name) }
-    var weight by remember { mutableStateOf(if(member.weight > 0) member.weight.toString() else "") }
-    var height by remember { mutableStateOf(if(member.height > 0) member.height.toString() else "") }
+    var weight by remember { mutableStateOf(if((member.weight ?: 0.0) > 0) (member.weight?.toString() ?: "") else "") }
+    var height by remember { mutableStateOf(if((member.height ?: 0.0) > 0) (member.height?.toString() ?: "") else "") }
 
     // --- LOGIKA WAKTU KALENDER (SAMA SEPERTI HOME) ---
     val currentTime = com.chiko0085.testgym.getCurrentTimeMillis()

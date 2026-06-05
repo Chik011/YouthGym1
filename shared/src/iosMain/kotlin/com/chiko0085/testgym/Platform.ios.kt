@@ -17,4 +17,6 @@ actual fun getCurrentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000
 
 actual fun formatEpochToDate(millis: Long): String = ""
 
+actual fun parseDateToMillis(dateStr: String): Long? = null
+
 actual fun initFirebase() { }
