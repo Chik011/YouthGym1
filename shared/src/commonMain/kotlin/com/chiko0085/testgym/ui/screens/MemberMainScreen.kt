@@ -172,6 +172,13 @@ fun MemberHomeScreen(member: Member) {
     // Member aktif jika kuota > 0 DAN hari di kalender > 0
     val isActive = member.remainingDays > 0 && calendarDaysLeft > 0
 
+    // Logika Warna berdasarkan Sisa Kuota Latihan (Bukan sisa waktu hari)
+    val statusColor = when {
+        member.remainingDays < 5 -> Color(0xFFF87171) // Merah
+        member.remainingDays in 5..10 -> Color(0xFFFBBF24) // Kuning
+        else -> AccentBlue // Biru
+    }
+
     // Menarik data Trainer langsung dari Firebase
     LaunchedEffect(Unit) {
         try {
@@ -204,36 +211,55 @@ fun MemberHomeScreen(member: Member) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // KARTU SISA KUOTA NEON GLOW (DENGAN LOGIKA WAKTU KALENDER)
+            // KARTU STATUS MEMBER (NEON GLOW)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(8.dp)
+                elevation = CardDefaults.cardElevation(12.dp)
             ) {
-                Box(modifier = Modifier.background(Brush.linearGradient(listOf(AccentBlueDark, AccentBlue))).padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Sisa Kuota Latihan", color = Color.White.copy(alpha = 0.8f))
-                        Text(
-                            text = if (isActive) "${member.remainingDays}X" else "HABIS",
-                            fontSize = 64.sp, fontWeight = FontWeight.Black, color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // --- INFO TANGGAL DAFTAR & EXPIRED ---
-                        val joinStr = formatEpochToDate(member.joinDate).split(" ").take(3).joinToString(" ")
-                        val expStr = formatEpochToDate(member.expiredDate).split(" ").take(3).joinToString(" ")
-                        
-                        Surface(color = Color.Black.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
-                            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Mulai: $joinStr", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f))
-                                Text("Sampai: $expStr", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold)
-                            }
+                Column(
+                    modifier = Modifier
+                        .background(Brush.verticalGradient(listOf(statusColor.copy(alpha = 0.8f), statusColor)))
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Sisa Kuota Latihan", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
+                    Text(
+                        text = if (isActive) "${member.remainingDays}X" else "HABIS",
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.3f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Masa Aktif", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                            Text("$calendarDaysLeft Hari", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color.White.copy(alpha = 0.3f)))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Sesi PT", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                            Text("${member.remainingPtSessions}X", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    val expStr = formatEpochToDate(member.expiredDate).split(" ").take(3).joinToString(" ")
+                    Surface(color = Color.Black.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            text = if (isActive) "Berlaku $calendarDaysLeft Hari Lagi" else "Silakan Perpanjang Paket",
-                            fontWeight = FontWeight.Bold, color = if (isActive) Color.White else Color(0xFFF87171)
+                            "Berlaku hingga: $expStr",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

@@ -2,6 +2,8 @@ package com.chiko0085.testgym.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -10,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -58,7 +61,7 @@ fun AdminDashboard(
     var searchQuery by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf("dashboard") }
-    
+
     // --- STATE UNTUK EDIT & HAPUS ---
     var memberToEdit by remember { mutableStateOf<Member?>(null) }
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
@@ -67,11 +70,30 @@ fun AdminDashboard(
     var showResetDialog by remember { mutableStateOf(false) }
     var snackbarHostState = remember { SnackbarHostState() }
 
+    // --- STATE BARU UNTUK FILTER EXCEL ---
+    var filterExpanded by remember { mutableStateOf(false) }
+    var selectedFilterText by remember { mutableStateOf("Semua Waktu") }
+    val filterOptions = listOf(
+        "Semua Waktu", "1 Bulan Terakhir", "2 Bulan Terakhir", "3 Bulan Terakhir",
+        "4 Bulan Terakhir", "5 Bulan Terakhir", "6 Bulan Terakhir", "7 Bulan Terakhir",
+        "8 Bulan Terakhir", "9 Bulan Terakhir", "10 Bulan Terakhir", "11 Bulan Terakhir", "1 Tahun Terakhir"
+    )
+
     val scope = rememberCoroutineScope()
-    val filteredMembers = members.filter { it.name.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery) }
 
     // Logic Switch Screen
     when (currentScreen) {
+        "members" -> MemberManagementScreen(
+            members = members,
+            gymPackages = gymPackages,
+            onCheckIn = { memberToCheckIn = it },
+            onEdit = { memberToEdit = it },
+            onDelete = { memberToDelete = it },
+            onAddMember = { showAddDialog = true },
+            onUpdateRevenue = onUpdateRevenue,
+            totalRevenue = totalRevenue,
+            onBack = { currentScreen = "dashboard" }
+        )
         "packages" -> PackageManagementScreen(gymPackages, onBack = { currentScreen = "dashboard" })
         "trainers" -> TrainerManagementScreen(trainers, onBack = { currentScreen = "dashboard" })
         "reservations" -> ReservationManagementScreen(onBack = { currentScreen = "dashboard" })
@@ -90,13 +112,17 @@ fun AdminDashboard(
                                 }
                             },
                             actions = {
-                                TextButton(onClick = { currentScreen = "packages" }) { 
-                                    Text("Paket", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) 
+                                // 🌟 KODE BARU: TOMBOL MENU MEMBER DI TOP BAR
+                                TextButton(onClick = { currentScreen = "members" }) {
+                                    Text("Member", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
-                                TextButton(onClick = { currentScreen = "trainers" }) { 
-                                    Text("Trainer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) 
+                                TextButton(onClick = { currentScreen = "packages" }) {
+                                    Text("Paket", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
-                                TextButton(onClick = { currentScreen = "reservations" }) { 
+                                TextButton(onClick = { currentScreen = "trainers" }) {
+                                    Text("Trainer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                TextButton(onClick = { currentScreen = "reservations" }) {
                                     Text("Padel", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 IconButton(onClick = { currentScreen = "profile" }) {
@@ -106,11 +132,6 @@ fun AdminDashboard(
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                         )
-                    },
-                    floatingActionButton = {
-                        FloatingActionButton(onClick = { showAddDialog = true }, containerColor = AccentBlue, shape = CircleShape) {
-                            Icon(Icons.Default.Add, "Tambah Member", tint = Color.White)
-                        }
                     }
                 ) { padding ->
                     LazyColumn(
@@ -141,14 +162,66 @@ fun AdminDashboard(
                                             Text("Reset Pendapatan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                                         }
                                     }
-                                    
+
+                                    // --- KODE FILTER DROPDOWN INTERAKTIF ---
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Rentang Filter Excel:", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                                        Box {
+                                            TextButton(
+                                                onClick = { filterExpanded = true },
+                                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.background(Color.White.copy(alpha = 0.15f))
+                                            ) {
+                                                Text(selectedFilterText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+                                            }
+                                            DropdownMenu(
+                                                expanded = filterExpanded,
+                                                onDismissRequest = { filterExpanded = false }
+                                            ) {
+                                                filterOptions.forEach { option ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(option) },
+                                                        onClick = {
+                                                            selectedFilterText = option
+                                                            filterExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Button(
                                         onClick = {
-                                            val html = generateRevenueHtml(members)
+                                            val nowTime = getCurrentTimeMillis()
+                                            val filteredForExcel = when (selectedFilterText) {
+                                                "1 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (1 * 30 * 86400000L) }
+                                                "2 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (2 * 30 * 86400000L) }
+                                                "3 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (3 * 30 * 86400000L) }
+                                                "4 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (4 * 30 * 86400000L) }
+                                                "5 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (5 * 30 * 86400000L) }
+                                                "6 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (6 * 30 * 86400000L) }
+                                                "7 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (7 * 30 * 86400000L) }
+                                                "8 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (8 * 30 * 86400000L) }
+                                                "9 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (9 * 30 * 86400000L) }
+                                                "10 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (10 * 30 * 86400000L) }
+                                                "11 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (11 * 30 * 86400000L) }
+                                                "1 Tahun Terakhir" -> members.filter { it.joinDate >= nowTime - (365 * 86400000L) }
+                                                else -> members
+                                            }
+
+                                            val html = generateRevenueHtml(filteredForExcel, selectedFilterText)
                                             exportToExcel(html)
                                             scope.launch {
-                                                snackbarHostState.showSnackbar("Laporan berhasil diunduh ke folder Downloads")
+                                                snackbarHostState.showSnackbar("Laporan ($selectedFilterText) berhasil diunduh")
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color.White),
@@ -163,51 +236,12 @@ fun AdminDashboard(
                             }
                         }
 
-                        item {
-                            // --- TAMBAHAN: KALENDER MINI ---
-                            CalendarCard()
-                        }
+                        item { CalendarCard() }
 
-                        item {
-                            // Search Bar
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Cari Member (Nama/ID)...", color = Color.Gray) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                leadingIcon = { Icon(Icons.Default.Search, null, tint = AccentBlue) },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = CardDark,
-                                    unfocusedContainerColor = CardDark,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = AccentBlue,
-                                    unfocusedBorderColor = Color.Transparent
-                                )
-                            )
-                        }
-
-                        item {
-                            Text("Daftar Member", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
-                        }
-
+                        // 🌟 LIST MEMBER SUDAH DIHAPUS DARI HOME UTAMA, DIGANTI DAN DISEDERHANAKAN DI SINI
                         item {
                             Text("Personal Trainer Aktif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
                             TrainerListRow(trainers, onTrainerClick = { trainerForSchedule = it })
-                        }
-
-                        item {
-                            Text("Daftar Member Gym", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
-                        }
-
-                        items(filteredMembers) { member ->
-                            MemberCard(
-                                member = member,
-                                onCheckIn = { memberToCheckIn = member },
-                                onEdit = { memberToEdit = member },
-                                onDelete = { memberToDelete = member }
-                            )
                         }
 
                         item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -245,9 +279,7 @@ fun AdminDashboard(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF87171))
                 ) { Text("Ya, Reset", color = Color.White) }
             },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Batal", color = Color.Gray) }
-            }
+            dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Batal", color = Color.Gray) } }
         )
     }
 
@@ -261,6 +293,7 @@ fun AdminDashboard(
                 Button(
                     onClick = {
                         val member = memberToCheckIn!!
+                        memberToCheckIn = null
                         scope.launch {
                             if (member.remainingDays > 0) {
                                 val updated = member.copy(remainingDays = member.remainingDays - 1)
@@ -270,21 +303,18 @@ fun AdminDashboard(
                                     val data = mapOf("remainingDays" to updated.remainingDays)
                                     db.collection("members").document(updated.id).update(data)
                                     snackbarHostState.showSnackbar("Check-in berhasil untuk ${member.name}")
-                                } catch (e: Exception) { 
-                                    println("DEBUG: Update Cloud gagal: ${e.message}") 
+                                } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar("Gagal check-in: ${e.message}")
                                 }
                             } else {
-                                snackbarHostState.showSnackbar("Gagal: Sisa hari sudah habis!")
+                                snackbarHostState.showSnackbar("Gagal check-in: Sisa hari sudah habis!")
                             }
-                            memberToCheckIn = null
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                 ) { Text("Ya, Check-in", color = Color.White) }
             },
-            dismissButton = {
-                TextButton(onClick = { memberToCheckIn = null }) { Text("Batal", color = Color.Gray) }
-            }
+            dismissButton = { TextButton(onClick = { memberToCheckIn = null }) { Text("Batal", color = Color.Gray) } }
         )
     }
 
@@ -293,25 +323,26 @@ fun AdminDashboard(
         AddMemberDialog(
             packages = gymPackages,
             onDismiss = { showAddDialog = false },
-            onConfirm = { n, u, p, d, price, joinDate, pkgName ->
+            onConfirm = { n, u, p, g, hp, d, pt, price, joinDate, pkgName ->
                 scope.launch {
                     try {
-                        val expirationTime = joinDate + (d * 86400000L) 
+                        val expirationTime = joinDate + (d * 86400000L)
                         val randomId = "CH-" + Random.nextInt(1000, 9999).toString()
-                        val newMember = Member(randomId, n, u, p, d, joinDate, expirationTime, 0.0, 0.0, price, pkgName)
+                        val newMember = Member(randomId, n, u, p, d, joinDate, expirationTime, 0.0, 0.0, g, hp, price, pkgName, pt)
 
-                        // Update Lokal
                         members.add(newMember)
                         onUpdateRevenue(totalRevenue + price)
                         showAddDialog = false
-                        
-                        // Update Cloud - Pakai Map agar aman di Desktop
+
                         val data = mapOf(
                             "id" to randomId,
                             "name" to n,
                             "username" to u,
                             "password" to p,
+                            "gender" to g,
+                            "phoneNumber" to hp,
                             "remainingDays" to d,
+                            "remainingPtSessions" to pt,
                             "joinDate" to joinDate,
                             "expiredDate" to expirationTime,
                             "weight" to 0.0,
@@ -320,10 +351,7 @@ fun AdminDashboard(
                             "packageName" to pkgName
                         )
                         db.collection("members").document(randomId).set(data)
-                        println("DEBUG: Member baru berhasil disimpan ke Cloud")
-                    } catch (e: Exception) { 
-                        println("WARNING: Member hanya tersimpan lokal karena error Cloud: ${e.message}") 
-                    }
+                    } catch (e: Exception) {}
                 }
             }
         )
@@ -337,12 +365,10 @@ fun AdminDashboard(
             onConfirm = { updated ->
                 scope.launch {
                     try {
-                        // Update Lokal
                         val idx = members.indexOfFirst { it.id == updated.id }
                         if (idx != -1) members[idx] = updated
                         memberToEdit = null
-                        
-                        // Update Cloud - Pakai Map
+
                         val data = mapOf(
                             "id" to updated.id,
                             "name" to updated.name,
@@ -355,7 +381,7 @@ fun AdminDashboard(
                             "height" to updated.height
                         )
                         db.collection("members").document(updated.id).set(data)
-                    } catch (e: Exception) { println("WARNING: Gagal update ke Cloud: ${e.message}") }
+                    } catch (e: Exception) {}
                 }
             }
         )
@@ -372,19 +398,14 @@ fun AdminDashboard(
                     scope.launch {
                         try {
                             val idToRemove = memberToDelete?.id!!
-                            // Update Lokal
                             members.removeAll { it.id == idToRemove }
                             memberToDelete = null
-                            
-                            // Update Cloud
                             db.collection("members").document(idToRemove).delete()
-                        } catch (e: Exception) { println("WARNING: Gagal hapus dari Cloud: ${e.message}") }
+                        } catch (e: Exception) {}
                     }
                 }) { Text("Hapus", color = Color.Red, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = {
-                TextButton(onClick = { memberToDelete = null }) { Text("Batal", color = Color.Gray) }
-            }
+            dismissButton = { TextButton(onClick = { memberToDelete = null }) { Text("Batal", color = Color.Gray) } }
         )
     }
 
@@ -395,32 +416,24 @@ fun AdminDashboard(
         var selectedMemberName by remember { mutableStateOf("Pilih Member") }
         var memberDropdownExpanded by remember { mutableStateOf(false) }
         var editingIndex by remember { mutableStateOf<Int?>(null) }
-        
+
         AlertDialog(
             onDismissRequest = { trainerForSchedule = null },
             title = { Text("Kelola Jadwal: Coach ${trainerForSchedule?.name}") },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Daftar Jadwal:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black) // Judul hitam
+                    Text("Daftar Jadwal:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Box(modifier = Modifier.heightIn(max = 200.dp)) {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val currentSchedules = trainerForSchedule?.schedules ?: emptyList()
                             itemsIndexed(currentSchedules) { index, schedule ->
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color.White), // Latar putih
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(schedule, fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)) // Text hitam
+                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(8.dp)) {
+                                    Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(schedule, fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                                         Row {
-                                            IconButton(onClick = { 
-                                                // Parser sederhana untuk edit
+                                            IconButton(onClick = {
                                                 try {
                                                     val parts = schedule.split(", ", " - ")
                                                     if(parts.size >= 3) {
@@ -430,13 +443,9 @@ fun AdminDashboard(
                                                     } else {
                                                         dayText = schedule
                                                     }
-                                                } catch(e: Exception) {
-                                                    dayText = schedule
-                                                }
+                                                } catch(e: Exception) { dayText = schedule }
                                                 editingIndex = index
-                                            }, modifier = Modifier.size(24.dp)) {
-                                                Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
-                                            }
+                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp)) }
                                             IconButton(onClick = {
                                                 val trainer = trainerForSchedule!!
                                                 val newList = trainer.schedules.toMutableList()
@@ -448,9 +457,7 @@ fun AdminDashboard(
                                                     if (idx != -1) trainers[idx] = updated
                                                     trainerForSchedule = updated
                                                 }
-                                            }, modifier = Modifier.size(24.dp)) {
-                                                Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                                            }
+                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp)) }
                                             IconButton(onClick = {
                                                 val trainer = trainerForSchedule!!
                                                 val newList = trainer.schedules.toMutableList()
@@ -462,75 +469,32 @@ fun AdminDashboard(
                                                     if (idx != -1) trainers[idx] = updated
                                                     trainerForSchedule = updated
                                                 }
-                                            }, modifier = Modifier.size(24.dp)) {
-                                                Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp))
-                                            }
+                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp)) }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    Divider(color = Color.Gray.copy(alpha = 0.3f))
+                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     Text("Form Jadwal:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AccentBlue)
-                    
-                    OutlinedTextField(
-                        value = dayText, onValueChange = { dayText = it },
-                        label = { Text("Hari (Cth: Senin)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.Black, 
-                            unfocusedTextColor = Color.Black,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        )
-                    )
+                    OutlinedTextField(value = dayText, onValueChange = { dayText = it }, label = { Text("Hari (Cth: Senin)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = timeText, onValueChange = { timeText = it },
-                        label = { Text("Jam (Cth: 10:00 WIB)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.Black, 
-                            unfocusedTextColor = Color.Black,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
-                        )
-                    )
+                    OutlinedTextField(value = timeText, onValueChange = { timeText = it }, label = { Text("Jam (Cth: 10:00 WIB)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Dropdown Pilih Member
+
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            value = selectedMemberName, onValueChange = {}, 
-                            label = { Text("Pilih Member") }, 
-                            readOnly = true, 
-                            shape = RoundedCornerShape(12.dp), 
-                            modifier = Modifier.fillMaxWidth(),
+                            value = selectedMemberName, onValueChange = {}, label = { Text("Pilih Member") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
                             trailingIcon = { IconButton(onClick = { memberDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.Black, 
-                                unfocusedTextColor = Color.Black,
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White
-                            )
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
                         )
                         DropdownMenu(expanded = memberDropdownExpanded, onDismissRequest = { memberDropdownExpanded = false }) {
-                            members.forEach { m ->
-                                DropdownMenuItem(
-                                    text = { Text(m.name) },
-                                    onClick = {
-                                        selectedMemberName = m.name
-                                        memberDropdownExpanded = false
-                                    }
-                                )
-                            }
+                            members.forEach { m -> DropdownMenuItem(text = { Text(m.name) }, onClick = { selectedMemberName = m.name; memberDropdownExpanded = false }) }
                         }
                     }
                 }
@@ -542,13 +506,9 @@ fun AdminDashboard(
                             val trainer = trainerForSchedule!!
                             val newList = trainer.schedules.toMutableList()
                             val formattedSchedule = "$dayText, $timeText - Melatih $selectedMemberName"
-                            
-                            if (editingIndex != null) {
-                                newList[editingIndex!!] = formattedSchedule
-                            } else {
-                                newList.add(formattedSchedule)
-                            }
-                            
+
+                            if (editingIndex != null) { newList[editingIndex!!] = formattedSchedule } else { newList.add(formattedSchedule) }
+
                             val updated = trainer.copy(schedules = newList)
                             scope.launch {
                                 try {
@@ -559,181 +519,16 @@ fun AdminDashboard(
                                     editingIndex = null
                                     trainerForSchedule = updated
                                     snackbarHostState.showSnackbar("Berhasil!")
-                                } catch (e: Exception) {
-                                    snackbarHostState.showSnackbar("Gagal: ${e.message}")
-                                }
+                                } catch (e: Exception) { snackbarHostState.showSnackbar("Gagal: ${e.message}") }
                             }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                 ) { Text(if (editingIndex != null) "Update" else "Tambah", color = Color.White) }
             },
-            dismissButton = {
-                TextButton(onClick = { trainerForSchedule = null }) { Text("Tutup", color = Color.Gray) }
-            }
+            dismissButton = { TextButton(onClick = { trainerForSchedule = null }) { Text("Tutup", color = Color.Gray) } }
         )
     }
-}
-
-// --- PERBARUAN: MEMBER CARD MENAMPILKAN TANGGAL DAFTAR DAN EXPIRED ---
-@Composable
-fun MemberCard(member: Member, onCheckIn: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    // Memformat tanggal jadi teks (Contoh: 23 Agustus 2026)
-    val joinDateString = com.chiko0085.testgym.formatEpochToDate(member.joinDate)
-    val expiredDateString = com.chiko0085.testgym.formatEpochToDate(member.expiredDate)
-    val isActive = member.remainingDays > 0
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp),
-        colors = CardDefaults.cardColors(containerColor = CardDark)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(45.dp).clip(CircleShape).background(AccentBlue),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(member.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(member.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-
-                // --- TANGGAL MUNCUL DI SINI ---
-                Text("Daftar: $joinDateString", fontSize = 11.sp, color = Color.Gray)
-                Text(
-                    text = "Expired: $expiredDateString (${member.remainingDays} Hari)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isActive) Color.LightGray else Color(0xFFF87171)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Surface(
-                    color = if (isActive) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = if (isActive) "AKTIF" else "EXPIRED",
-                        color = if (isActive) Color(0xFF34D399) else Color(0xFFF87171),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-            Button(
-                onClick = onCheckIn,
-                modifier = Modifier.padding(start = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981).copy(alpha = 0.1f)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Check-in Manual", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.LightGray) }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFF87171)) }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddMemberDialog(packages: List<GymPackage>, onDismiss: () -> Unit, onConfirm: (String, String, String, Int, Double, Long, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var user by remember { mutableStateOf("") }
-    var pass by remember { mutableStateOf("") }
-    var days by remember { mutableStateOf("") }
-    var selectedPrice by remember { mutableDoubleStateOf(0.0) }
-    var expanded by remember { mutableStateOf(false) }
-    var selectedPackageName by remember { mutableStateOf("Pilih Paket (Opsional)") }
-    
-    // Default join date adalah hari ini (WIB)
-    val now = com.chiko0085.testgym.getCurrentTimeMillis()
-    val fullDate = com.chiko0085.testgym.formatEpochToDate(now) // "dd MMMM yyyy HH:mm"
-    var joinDateStr by remember { mutableStateOf(fullDate.split(" ").take(3).joinToString(" ")) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Tambah Member Baru", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") }, leadingIcon = { Icon(Icons.Default.Person, null) }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, leadingIcon = { Icon(Icons.Default.Lock, null) }, shape = RoundedCornerShape(12.dp))
-
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedPackageName, onValueChange = {}, label = { Text("Pilih Paket") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = { IconButton(onClick = { expanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
-                    )
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        packages.forEach { pkg ->
-                            DropdownMenuItem(
-                                text = { Text("${pkg.name} - Rp ${formatRupiah(pkg.price ?: 0.0)}") },
-                                onClick = {
-                                    selectedPackageName = pkg.name
-                                    days = pkg.durationDays.toString()
-                                    selectedPrice = pkg.price ?: 0.0
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Masa Aktif (Hari)") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = joinDateStr, onValueChange = { joinDateStr = it }, label = { Text("Tgl Daftar (Cth: 10 Juni 2026)") }, shape = RoundedCornerShape(12.dp), placeholder = { Text("10 Juni 2026") })
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    val millis = parseDateToMillis(joinDateStr) ?: com.chiko0085.testgym.getCurrentTimeMillis()
-                    onConfirm(name, user, pass, days.toIntOrNull() ?: 0, selectedPrice, millis, selectedPackageName) 
-                },
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) { Text("Simpan Member", fontWeight = FontWeight.Bold, color = Color.White) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
-    )
-}
-
-@Composable
-fun EditMemberDialog(member: Member, onDismiss: () -> Unit, onConfirm: (Member) -> Unit) {
-    var name by remember { mutableStateOf(member.name) }
-    var user by remember { mutableStateOf(member.username) }
-    var pass by remember { mutableStateOf(member.password) }
-    var days by remember { mutableStateOf(member.remainingDays.toString()) }
-    val fullDate = com.chiko0085.testgym.formatEpochToDate(member.joinDate)
-    var joinDateStr by remember { mutableStateOf(fullDate.split(" ").take(3).joinToString(" ")) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Data Member", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Sisa Hari") }, shape = RoundedCornerShape(12.dp))
-                OutlinedTextField(value = joinDateStr, onValueChange = { joinDateStr = it }, label = { Text("Tgl Daftar (Cth: 10 Juni 2026)") }, shape = RoundedCornerShape(12.dp))
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    val newJoin = parseDateToMillis(joinDateStr) ?: member.joinDate
-                    val d = days.toIntOrNull() ?: 0
-                    val newExp = newJoin + (d * 86400000L)
-                    onConfirm(member.copy(name=name, username=user, password=pass, remainingDays=d, joinDate=newJoin, expiredDate=newExp)) 
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) { Text("Update", color = Color.White) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -746,28 +541,12 @@ fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () 
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("Manajemen Paket Harga", color = Color.White) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    navigationIcon = {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
-                    }
-                )
-            },
-            floatingActionButton = {
-                FloatingActionButton(onClick = { showAddPackage = true }, containerColor = AccentBlue) {
-                    Icon(Icons.Default.Add, null, tint = Color.White)
-                }
-            }
+            topBar = { TopAppBar(title = { Text("Manajemen Paket Harga", color = Color.White) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent), navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }) },
+            floatingActionButton = { FloatingActionButton(onClick = { showAddPackage = true }, containerColor = AccentBlue) { Icon(Icons.Default.Add, null, tint = Color.White) } }
         ) { padding ->
             LazyColumn(modifier = Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(packages) { pkg ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = CardDark)
-                    ) {
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(pkg.name, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
@@ -779,16 +558,9 @@ fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () 
                                 scope.launch {
                                     try {
                                         val idToRemove = pkg.id
-                                        // Hapus Lokal
                                         packages.remove(pkg)
-                                        
-                                        // Hapus Cloud
                                         db.collection("gym_packages").document(idToRemove).delete()
-                                        println("DEBUG: Berhasil hapus paket ${pkg.name} dari cloud")
-                                    } catch (e: Exception) {
-                                        println("ERROR: Gagal hapus paket dari cloud: ${e.message}")
-                                        e.printStackTrace()
-                                    }
+                                    } catch (e: Exception) {}
                                 }
                             }) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171)) }
                         }
@@ -799,65 +571,31 @@ fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () 
     }
 
     if (showAddPackage) {
-        PackageDialog(
-            title = "Tambah Paket",
-            onDismiss = { showAddPackage = false },
-            onConfirm = { n, p, d ->
-                scope.launch {
-                    try {
-                        val randomId = Random.nextInt(100000, 999999).toString()
-                        val newPkg = GymPackage(randomId, n, p, d)
-                        
-                        // Tambah ke list lokal dulu agar UI update
-                        packages.add(newPkg)
-                        showAddPackage = false
-
-                        // Coba simpan ke Cloud
-                        val data = mapOf(
-                            "id" to randomId,
-                            "name" to n,
-                            "price" to p,
-                            "durationDays" to d
-                        )
-                        db.collection("gym_packages").document(randomId).set(data)
-                        println("DEBUG: Berhasil simpan paket ke Cloud")
-                    } catch (e: Exception) {
-                        println("WARNING: Gagal simpan ke Cloud, tapi list lokal terupdate: ${e.message}")
-                    }
-                }
+        PackageDialog(title = "Tambah Paket", onDismiss = { showAddPackage = false }, onConfirm = { n, p, d ->
+            scope.launch {
+                try {
+                    val randomId = Random.nextInt(100000, 999999).toString()
+                    val newPkg = GymPackage(randomId, n, p, d)
+                    packages.add(newPkg)
+                    showAddPackage = false
+                    db.collection("gym_packages").document(randomId).set(mapOf("id" to randomId, "name" to n, "price" to p, "durationDays" to d))
+                } catch (e: Exception) {}
             }
-        )
+        })
     }
 
     if (packageToEdit != null) {
-        PackageDialog(
-            title = "Edit Paket",
-            initialPackage = packageToEdit,
-            onDismiss = { packageToEdit = null },
-            onConfirm = { n, p, d ->
-                scope.launch {
-                    try {
-                        val updatedPkg = packageToEdit!!.copy(name = n, price = p, durationDays = d)
-                        
-                        // Update lokal
-                        val idx = packages.indexOfFirst { it.id == updatedPkg.id }
-                        if (idx != -1) packages[idx] = updatedPkg
-                        packageToEdit = null
-
-                        // Update Cloud
-                        val data = mapOf(
-                            "id" to updatedPkg.id,
-                            "name" to n,
-                            "price" to p,
-                            "durationDays" to d
-                        )
-                        db.collection("gym_packages").document(updatedPkg.id).set(data)
-                    } catch (e: Exception) {
-                        println("WARNING: Gagal update ke Cloud: ${e.message}")
-                    }
-                }
+        PackageDialog(title = "Edit Paket", initialPackage = packageToEdit, onDismiss = { packageToEdit = null }, onConfirm = { n, p, d ->
+            scope.launch {
+                try {
+                    val updatedPkg = packageToEdit!!.copy(name = n, price = p, durationDays = d)
+                    val idx = packages.indexOfFirst { it.id == updatedPkg.id }
+                    if (idx != -1) packages[idx] = updatedPkg
+                    packageToEdit = null
+                    db.collection("gym_packages").document(updatedPkg.id).set(mapOf("id" to updatedPkg.id, "name" to n, "price" to p, "durationDays" to d))
+                } catch (e: Exception) {}
             }
-        )
+        })
     }
 }
 
@@ -872,48 +610,18 @@ fun PackageDialog(title: String, initialPackage: GymPackage? = null, onDismiss: 
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name, 
-                    onValueChange = { name = it }, 
-                    label = { Text("Nama Paket") }, 
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = price, 
-                    onValueChange = { price = it }, 
-                    label = { Text("Harga (Angka saja)") }, 
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = days, 
-                    onValueChange = { days = it }, 
-                    label = { Text("Durasi (Hari)") }, 
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Paket") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga (Angka saja)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("Durasi (Hari)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val p = price.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
-                    val d = days.filter { it.isDigit() }.toIntOrNull() ?: 0
-                    if (name.isNotBlank()) {
-                        onConfirm(name, p, d)
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) { Text("Simpan", color = Color.White) }
+            Button(onClick = { onConfirm(name, price.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0, days.filter { it.isDigit() }.toIntOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Simpan", color = Color.White) }
         },
-        dismissButton = { 
-            TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } 
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
     )
 }
 
-// --- FUNGSI MANAJEMEN TRAINER ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> Unit) {
@@ -944,8 +652,11 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(trainer.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
                                 Text("Username: ${trainer.username}", color = AccentBlue, fontSize = 12.sp)
-                                Text("Exp: ${trainer.experience}", color = Color.Gray, fontSize = 12.sp)
-                                Text(trainer.specialization, color = Color.LightGray, fontSize = 14.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Gender: ${trainer.gender}", color = Color.LightGray, fontSize = 12.sp)
+                                    Text("Exp: ${trainer.experience}", color = Color.LightGray, fontSize = 12.sp)
+                                }
+                                Text("Skill: ${trainer.specialization}", color = Color.LightGray, fontSize = 14.sp)
                             }
                             IconButton(onClick = { trainerToEdit = trainer }) { Icon(Icons.Default.Edit, null, tint = Color.LightGray) }
                             IconButton(onClick = {
@@ -965,26 +676,23 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
     }
 
     if (showAddTrainer) {
-        TrainerDialog(onDismiss = { showAddTrainer = false }, onConfirm = { n, u, p ->
+        TrainerDialog(onDismiss = { showAddTrainer = false }, onConfirm = { n, u, p, g, s, e ->
             scope.launch {
                 try {
                     val newId = "PT-" + Random.nextInt(100, 999).toString()
-                    val s = "Personal Trainer" // Default specialization
-                    val e = "1 Tahun" // Default experience
-                    val r = 5.0 // Default rate
-                    val d = "Trainer di Youth Gym" // Default description
-                    val newTrainer = Trainer(newId, n, u, p, s, e, r, d)
-                    
-                    // Lokal
+                    val r = 5.0
+                    val d = "Trainer di Youth Gym"
+                    val newTrainer = Trainer(newId, n, u, p, g, s, e, r, d)
+
                     trainers.add(newTrainer)
                     showAddTrainer = false
-                    
-                    // Cloud
+
                     val data = mapOf(
                         "id" to newId,
                         "name" to n,
                         "username" to u,
                         "password" to p,
+                        "gender" to g,
                         "specialization" to s,
                         "experience" to e,
                         "rate" to r,
@@ -1003,17 +711,16 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
             onConfirm = { updated ->
                 scope.launch {
                     try {
-                        // Update Lokal
                         val idx = trainers.indexOfFirst { it.id == updated.id }
                         if (idx != -1) trainers[idx] = updated
                         trainerToEdit = null
-                        
-                        // Update Cloud
+
                         val data = mapOf(
                             "id" to updated.id,
                             "name" to updated.name,
                             "username" to updated.username,
                             "password" to updated.password,
+                            "gender" to updated.gender,
                             "specialization" to updated.specialization,
                             "experience" to updated.experience,
                             "rate" to updated.rating,
@@ -1027,42 +734,16 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditTrainerDialog(trainer: Trainer, onDismiss: () -> Unit, onConfirm: (Trainer) -> Unit) {
-    var name by remember { mutableStateOf(trainer.name) }
-    var user by remember { mutableStateOf(trainer.username) }
-    var pass by remember { mutableStateOf(trainer.password) }
-    var exp by remember { mutableStateOf(trainer.experience) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Data Trainer", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = exp, onValueChange = { exp = it }, label = { Text("Pengalaman (Cth: 2 Tahun)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    onConfirm(trainer.copy(name = name, username = user, password = pass, experience = exp)) 
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) { Text("Update", color = Color.White) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
-    )
-}
-
-
-@Composable
-fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> Unit) {
+fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String, String, String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("Laki-laki") }
+    var skill by remember { mutableStateOf("") }
+    var exp by remember { mutableStateOf("") }
+    var genderExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1072,14 +753,70 @@ fun TrainerDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> 
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = gender, onValueChange = {}, label = { Text("Jenis Kelamin") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { genderExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
+                        listOf("Laki-laki", "Perempuan").forEach { item ->
+                            DropdownMenuItem(text = { Text(item) }, onClick = { gender = item; genderExpanded = false })
+                        }
+                    }
+                }
+                OutlinedTextField(value = skill, onValueChange = { skill = it }, label = { Text("Skill / Spesialisasi (Cth: Muay Thai)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = exp, onValueChange = { exp = it }, label = { Text("Pengalaman (Cth: 3 Tahun)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank() && user.isNotBlank()) onConfirm(name, user, pass) }, 
+                onClick = { if (name.isNotBlank() && user.isNotBlank()) onConfirm(name, user, pass, gender, skill, exp) },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                 shape = RoundedCornerShape(8.dp)
             ) { Text("Simpan", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditTrainerDialog(trainer: Trainer, onDismiss: () -> Unit, onConfirm: (Trainer) -> Unit) {
+    var name by remember { mutableStateOf(trainer.name) }
+    var user by remember { mutableStateOf(trainer.username) }
+    var pass by remember { mutableStateOf(trainer.password) }
+    var gender by remember { mutableStateOf(trainer.gender) }
+    var skill by remember { mutableStateOf(trainer.specialization) }
+    var exp by remember { mutableStateOf(trainer.experience) }
+    var genderExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Data Trainer", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = user, onValueChange = { user = it }, label = { Text("Username") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = gender, onValueChange = {}, label = { Text("Jenis Kelamin") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { genderExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
+                        listOf("Laki-laki", "Perempuan").forEach { item ->
+                            DropdownMenuItem(text = { Text(item) }, onClick = { gender = item; genderExpanded = false })
+                        }
+                    }
+                }
+                OutlinedTextField(value = skill, onValueChange = { skill = it }, label = { Text("Skill / Spesialisasi") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = exp, onValueChange = { exp = it }, label = { Text("Pengalaman") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(trainer.copy(name = name, username = user, password = pass, gender = gender, specialization = skill, experience = exp)) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Update", color = Color.White) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
     )
@@ -1107,25 +844,9 @@ fun AdminProfileScreen(admin: Admin, onUpdate: (Admin) -> Unit, onBack: () -> Un
         ) { padding ->
             Column(modifier = Modifier.padding(padding).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Ubah Kredensial Login", color = AccentBlue, fontWeight = FontWeight.Bold)
-                
-                OutlinedTextField(
-                    value = username, onValueChange = { username = it },
-                    label = { Text("Username Baru") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray)
-                )
-
-                OutlinedTextField(
-                    value = password, onValueChange = { password = it },
-                    label = { Text("Password Baru") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray)
-                )
-
+                OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username Baru") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray))
+                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password Baru") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray))
                 Spacer(modifier = Modifier.height(24.dp))
-
                 Button(
                     onClick = {
                         scope.launch {
@@ -1139,12 +860,8 @@ fun AdminProfileScreen(admin: Admin, onUpdate: (Admin) -> Unit, onBack: () -> Un
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                ) {
-                    Text("Simpan Perubahan", fontWeight = FontWeight.Bold, color = Color.White)
-                }
+                    modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) { Text("Simpan Perubahan", fontWeight = FontWeight.Bold, color = Color.White) }
             }
         }
     }
@@ -1170,21 +887,11 @@ fun TrainerListRow(trainers: SnapshotStateList<Trainer>, onTrainerClick: (Traine
     if (trainers.isEmpty()) {
         Text("Belum ada trainer terdaftar", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
     } else {
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
             items(trainers) { trainer ->
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardDark),
-                    modifier = Modifier.width(140.dp),
-                    onClick = { onTrainerClick(trainer) }
-                ) {
+                Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = CardDark), modifier = Modifier.width(140.dp), onClick = { onTrainerClick(trainer) }) {
                     Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = AccentBlue.copy(alpha = 0.2f)) {
-                            Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue)
-                        }
+                        Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = AccentBlue.copy(alpha = 0.2f)) { Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue) }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(trainer.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1)
                         Text("Trainer", fontSize = 10.sp, color = Color.Gray)
@@ -1195,40 +902,196 @@ fun TrainerListRow(trainers: SnapshotStateList<Trainer>, onTrainerClick: (Traine
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddMemberDialog(
+    packages: List<GymPackage>,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, String, String, Int, Int, Double, Long, String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("Laki-laki") }
+    var phone by remember { mutableStateOf("") }
+    var ptSessions by remember { mutableStateOf("0") }
+    var selectedPackage by remember { mutableStateOf<GymPackage?>(null) }
+    val joinDate = getCurrentTimeMillis()
+    var expanded by remember { mutableStateOf(false) }
+    var genderExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tambah Member Baru", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Nomor HP") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = ptSessions, onValueChange = { ptSessions = it }, label = { Text("Sesi PT") }, modifier = Modifier.fillMaxWidth())
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = gender, onValueChange = {}, label = { Text("Jenis Kelamin") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { genderExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
+                        listOf("Laki-laki", "Perempuan").forEach { item ->
+                            DropdownMenuItem(text = { Text(item) }, onClick = { gender = item; genderExpanded = false })
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedPackage?.name ?: "Pilih Paket",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Paket") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { expanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        packages.forEach { pkg ->
+                            DropdownMenuItem(
+                                text = { Text("${pkg.name} - Rp ${formatRupiah(pkg.price ?: 0.0)}") },
+                                onClick = {
+                                    selectedPackage = pkg
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    selectedPackage?.let { pkg ->
+                        onConfirm(name, username, password, gender, phone, pkg.durationDays, ptSessions.toIntOrNull() ?: 0, pkg.price ?: 0.0, joinDate, pkg.name)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text("Simpan", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditMemberDialog(
+    member: Member,
+    onDismiss: () -> Unit,
+    onConfirm: (Member) -> Unit
+) {
+    var name by remember { mutableStateOf(member.name) }
+    var username by remember { mutableStateOf(member.username) }
+    var password by remember { mutableStateOf(member.password) }
+    var remainingDays by remember { mutableStateOf(member.remainingDays.toString()) }
+    var ptSessions by remember { mutableStateOf(member.remainingPtSessions.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Data Member", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = remainingDays, onValueChange = { remainingDays = it }, label = { Text("Sisa Hari") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = ptSessions, onValueChange = { ptSessions = it }, label = { Text("Sesi PT") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val updated = member.copy(
+                        name = name,
+                        username = username,
+                        password = password,
+                        remainingDays = remainingDays.toIntOrNull() ?: member.remainingDays,
+                        remainingPtSessions = ptSessions.toIntOrNull() ?: member.remainingPtSessions
+                    )
+                    onConfirm(updated)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text("Update", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
+}
+
+@Composable
+fun MemberCard(
+    member: Member,
+    onCheckIn: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onExtend: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardDark)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(member.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                    Text("ID: ${member.id} • ${member.gender}", color = AccentBlue, fontSize = 12.sp)
+                    Text("Paket: ${member.packageName}", color = Color.LightGray, fontSize = 12.sp)
+                    Text("HP: ${member.phoneNumber}", color = Color.LightGray, fontSize = 12.sp)
+                    Text(
+                        "Sisa: ${member.remainingDays} Hari • PT: ${member.remainingPtSessions} Sesi",
+                        color = if (member.remainingDays > 0) Color(0xFF34D399) else Color(0xFFF87171),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+                Row {
+                    IconButton(onClick = onCheckIn) { Icon(Icons.Default.CheckCircle, "Check-in", tint = Color(0xFF10B981)) }
+                    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit", tint = Color.LightGray) }
+                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Hapus", tint = Color(0xFFF87171)) }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onExtend,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Perpanjang Paket", color = Color.White, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
 @Composable
 fun CalendarCard() {
-    val now = com.chiko0085.testgym.getCurrentTimeMillis()
-    val dateStr = com.chiko0085.testgym.formatEpochToDate(now) // "dd MMMM yyyy HH:mm"
+    val now = getCurrentTimeMillis()
+    val dateStr = formatEpochToDate(now)
     val parts = dateStr.split(" ")
     val day = parts.getOrNull(0) ?: ""
     val month = parts.getOrNull(1) ?: ""
     val year = parts.getOrNull(2) ?: ""
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CardDark)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Tampilan Ikon Kalender Bergaya
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AccentBlue.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(AccentBlue.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(month.take(3).uppercase(), color = AccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(day, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
                 }
             }
-            
             Spacer(modifier = Modifier.width(16.dp))
-            
             Column {
                 Text("Hari Ini", color = Color.Gray, fontSize = 12.sp)
                 Text("$day $month $year", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -1238,10 +1101,10 @@ fun CalendarCard() {
     }
 }
 
-fun generateRevenueHtml(members: List<Member>): String {
+fun generateRevenueHtml(members: List<Member>, filterRange: String = "Semua Waktu"): String {
     val sortedMembers = members.sortedBy { it.joinDate }
     var cumulativeRevenue = 0.0
-    
+
     val htmlBuilder = StringBuilder()
     htmlBuilder.append("""
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -1257,7 +1120,7 @@ fun generateRevenueHtml(members: List<Member>): String {
             </style>
         </head>
         <body>
-            <div class="header-title">LAPORAN PENDAPATAN YOUTH GYM</div>
+            <div class="header-title">LAPORAN PENDAPATAN YOUTH GYM ($filterRange)</div>
             <table>
                 <thead>
                     <tr>
@@ -1275,8 +1138,8 @@ fun generateRevenueHtml(members: List<Member>): String {
 
     sortedMembers.forEachIndexed { index, m ->
         cumulativeRevenue += (m.pricePaid ?: 0.0)
-        val dateStr = com.chiko0085.testgym.formatEpochToDate(m.joinDate).split(" ").take(3).joinToString(" ")
-        
+        val dateStr = formatEpochToDate(m.joinDate).split(" ").take(3).joinToString(" ")
+
         htmlBuilder.append("""
             <tr>
                 <td>${index + 1}</td>
@@ -1302,7 +1165,7 @@ fun generateRevenueHtml(members: List<Member>): String {
         </body>
         </html>
     """.trimIndent())
-    
+
     return htmlBuilder.toString()
 }
 
@@ -1323,21 +1186,16 @@ fun ReservationManagementScreen(onBack: () -> Unit) {
         try {
             val dateStr = formatEpochToDate(selectedDateMillis).split(" ").take(3).joinToString(" ")
             val dayStart = com.chiko0085.testgym.parseDateToMillis(dateStr) ?: selectedDateMillis
-            
-            val snapshot = db.collection("reservations")
-                .where("date", equalTo = dayStart)
-                .get()
-            
+
+            val snapshot = db.collection("reservations").where("date", equalTo = dayStart).get()
             val dbReservations = snapshot.documents.map { it.data<Reservation>() }
             val fullList = mutableListOf<Reservation>()
-            // Batasi jam buka: 08:00 sampai 00:00 (jam 23 ke 24)
             for (i in 8..23) {
                 val found = dbReservations.find { it.hour == i }
                 fullList.add(found ?: Reservation(id = "${dayStart}_$i", date = dayStart, hour = i, status = "Empty"))
             }
             reservations = fullList
         } catch (e: Exception) {
-            println("ERROR: Gagal ambil reservasi: ${e.message}")
         } finally {
             isLoading = false
         }
@@ -1346,31 +1204,19 @@ fun ReservationManagementScreen(onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("Manajemen Jadwal Padel", color = Color.White) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    navigationIcon = {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
-                    }
-                )
-            }
+            topBar = { TopAppBar(title = { Text("Manajemen Jadwal Padel", color = Color.White) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent), navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }) }
         ) { padding ->
             Column(modifier = Modifier.padding(padding).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Tanggal: ${formatEpochToDate(selectedDateMillis).split(" ").take(3).joinToString(" ")}", color = Color.White, fontWeight = FontWeight.Bold)
                     Row {
-                        IconButton(onClick = { selectedDateMillis -= 86400000L }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
-                        IconButton(onClick = { selectedDateMillis += 86400000L }) { Icon(Icons.Default.ArrowForward, null, tint = Color.White) }
+                        IconButton(onClick = { selectedDateMillis -= 86400000L }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
+                        IconButton(onClick = { selectedDateMillis += 86400000L }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White) }
                     }
                 }
-                
                 Spacer(modifier = Modifier.height(16.dp))
-                
                 if (isLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AccentBlue)
-                    }
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentBlue) }
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                         items(reservations) { res ->
@@ -1393,42 +1239,232 @@ fun ReservationManagementScreen(onBack: () -> Unit) {
 
 @Composable
 fun ReservationSlotCard(reservation: Reservation, onToggleStatus: (String) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CardDark)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 val hourStr = if (reservation.hour < 10) "0${reservation.hour}:00" else "${reservation.hour}:00"
                 val nextHour = if (reservation.hour + 1 < 10) "0${reservation.hour + 1}:00" else "${reservation.hour + 1}:00"
                 Text("$hourStr - $nextHour", color = Color.White, fontWeight = FontWeight.Bold)
-                Text(if (reservation.status == "Empty") "Kosong" else "Terisi (${reservation.reservedByName})", 
-                    color = if (reservation.status == "Empty") Color(0xFF34D399) else Color(0xFFF87171),
-                    fontSize = 12.sp)
+                Text(if (reservation.status == "Empty") "Kosong" else "Terisi (${reservation.reservedByName})", color = if (reservation.status == "Empty") Color(0xFF34D399) else Color(0xFFF87171), fontSize = 12.sp)
             }
-            
             Row {
-                Button(
-                    onClick = { onToggleStatus("Empty") },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (reservation.status == "Empty") Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f)),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Text("Kosong", fontSize = 10.sp, color = Color.White)
-                }
+                Button(onClick = { onToggleStatus("Empty") }, colors = ButtonDefaults.buttonColors(containerColor = if (reservation.status == "Empty") Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f)), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp), modifier = Modifier.height(32.dp)) { Text("Kosong", fontSize = 10.sp, color = Color.White) }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { onToggleStatus("Booked") },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (reservation.status == "Booked") Color(0xFFEF4444) else Color.Gray.copy(alpha = 0.3f)),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp)
+                Button(onClick = { onToggleStatus("Booked") }, colors = ButtonDefaults.buttonColors(containerColor = if (reservation.status == "Booked") Color(0xFFEF4444) else Color.Gray.copy(alpha = 0.3f)), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp), modifier = Modifier.height(32.dp)) { Text("Terisi", fontSize = 10.sp, color = Color.White) }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🌟 KODE BARU: HALAMAN MANAJEMEN MEMBER DENGAN STRUKTUR SEGMEN FILTER AKTIF / EXPIRED
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MemberManagementScreen(
+    members: List<Member>,
+    gymPackages: List<GymPackage>,
+    onCheckIn: (Member) -> Unit,
+    onEdit: (Member) -> Unit,
+    onDelete: (Member) -> Unit,
+    onAddMember: () -> Unit,
+    onUpdateRevenue: (Double) -> Unit,
+    totalRevenue: Double,
+    onBack: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("Semua") } // Opsi: Semua, Aktif, Tidak Aktif
+    var memberToExtend by remember { mutableStateOf<Member?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // Menggabungkan logika search bar dan filter tab aktif / tidak aktif
+    val finalFilteredList = members.filter { member ->
+        val matchesSearch = member.name.contains(searchQuery, ignoreCase = true) || member.id.contains(searchQuery)
+        val isActive = member.remainingDays > 0
+        val matchesFilter = when (selectedFilter) {
+            "Aktif" -> isActive
+            "Tidak Aktif" -> !isActive
+            else -> true
+        }
+        matchesSearch && matchesFilter
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Manajemen Member Gym", color = Color.White, fontWeight = FontWeight.Bold) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onAddMember) {
+                            Icon(Icons.Default.Add, "Tambah Member", tint = Color.White)
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+                // Search Field Bertema Gelap
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Cari Member (Nama/ID)...", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = AccentBlue) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = CardDark,
+                        unfocusedContainerColor = CardDark,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Baris Filter Tab Segmented (Semua, Aktif, Tidak Aktif)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Terisi", fontSize = 10.sp, color = Color.White)
+                    listOf("Semua", "Aktif", "Tidak Aktif").forEach { filterOption ->
+                        val isSelected = selectedFilter == filterOption
+                        Button(
+                            onClick = { selectedFilter = filterOption },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSelected) AccentBlue else CardDark,
+                                contentColor = if (isSelected) Color.White else Color.LightGray
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(filterOption, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // List Tampilan Member Berdasarkan Hasil Filter
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
+                    if (finalFilteredList.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Text("Tidak ada data member found.", color = Color.Gray, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        items(finalFilteredList) { member ->
+                            MemberCard(
+                                member = member,
+                                onCheckIn = { onCheckIn(member) },
+                                onEdit = { onEdit(member) },
+                                onDelete = { onDelete(member) },
+                                onExtend = { memberToExtend = member }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+
+    if (memberToExtend != null) {
+        ExtendMembershipDialog(
+            member = memberToExtend!!,
+            packages = gymPackages,
+            onDismiss = { memberToExtend = null },
+            onConfirm = { pkg ->
+                scope.launch {
+                    try {
+                        val m = memberToExtend!!
+                        val updatedRemaining = m.remainingDays + pkg.durationDays
+                        val updatedPricePaid = (m.pricePaid ?: 0.0) + pkg.price!!
+                        
+                        val updated = m.copy(
+                            remainingDays = updatedRemaining,
+                            pricePaid = updatedPricePaid,
+                            packageName = pkg.name
+                        )
+                        
+                        db.collection("members").document(m.id).update(mapOf(
+                            "remainingDays" to updatedRemaining,
+                            "pricePaid" to updatedPricePaid,
+                            "packageName" to pkg.name
+                        ))
+                        
+                        // Update local state if needed (handled via members list in AdminDashboard)
+                        val idx = members.indexOfFirst { it.id == m.id }
+                        if (idx != -1) {
+                            if (members is MutableList) {
+                                (members as MutableList<Member>)[idx] = updated
+                            }
+                        }
+                        
+                        onUpdateRevenue(totalRevenue + (pkg.price ?: 0.0))
+                        memberToExtend = null
+                    } catch (e: Exception) {}
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExtendMembershipDialog(
+    member: Member,
+    packages: List<GymPackage>,
+    onDismiss: () -> Unit,
+    onConfirm: (GymPackage) -> Unit
+) {
+    var selectedPackage by remember { mutableStateOf<GymPackage?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Perpanjang Paket: ${member.name}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Pilih paket baru untuk menambahkan masa aktif member.", fontSize = 14.sp)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedPackage?.name ?: "Pilih Paket",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Paket") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { expanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        packages.forEach { pkg ->
+                            DropdownMenuItem(
+                                text = { Text("${pkg.name} - Rp ${formatRupiah(pkg.price ?: 0.0)}") },
+                                onClick = {
+                                    selectedPackage = pkg
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { selectedPackage?.let { onConfirm(it) } },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text("Perpanjang", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
 }

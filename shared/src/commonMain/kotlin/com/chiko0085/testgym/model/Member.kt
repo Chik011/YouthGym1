@@ -13,6 +13,9 @@ data class Member(
     var expiredDate: Long = 0L,
     var weight: Double? = 0.0,
     var height: Double? = 0.0,
+    var gender: String = "Laki-laki",
+    var phoneNumber: String = "",
     var pricePaid: Double? = 0.0,    // Tambahan untuk laporan keuangan
-    var packageName: String = ""   // Tambahan untuk laporan keuangan
+    var packageName: String = "",   // Tambahan untuk laporan keuangan
+    var remainingPtSessions: Int = 0 // Sisa sesi Personal Trainer
 )

@@ -9,6 +9,7 @@ data class Trainer(
     val name: String,
     val username: String = "",
     val password: String = "",
+    val gender: String = "Laki-laki",
     val specialization: String,
     val experience: String,
     @SerialName("rate")
