@@ -13,6 +13,10 @@ actual fun openWebLink(url: String) {
 
 }
 
+actual fun openEmailClient(recipient: String, subject: String, body: String) {
+
+}
+
 actual fun getCurrentTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1000).toLong()
 
 actual fun formatEpochToDate(millis: Long): String = ""

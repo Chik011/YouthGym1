@@ -20,11 +20,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.Trainer
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainerMainScreen(trainer: Trainer, onLogout: () -> Unit) {
     val bgGradient = Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A192F)))
+    val scope = rememberCoroutineScope()
+    
+    // State untuk availability
+    var currentAvailability by remember { mutableStateOf(trainer.availability) }
+    val daysOfWeek = listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 
     // Mengambil jadwal langsung dari objek trainer yang login
     val schedules = trainer.schedules.ifEmpty { 
@@ -72,6 +79,52 @@ fun TrainerMainScreen(trainer: Trainer, onLogout: () -> Unit) {
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text("STAFF / UNLIMITED ACCESS", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Atur Ketersediaan Hari (Available)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Pilih hari di mana Anda bisa melatih member.", color = Color.Gray, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF112240).copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        daysOfWeek.forEach { day ->
+                            val isAvailable = currentAvailability.contains(day)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isAvailable,
+                                    onCheckedChange = { checked ->
+                                        val newList = if (checked) {
+                                            currentAvailability + day
+                                        } else {
+                                            currentAvailability - day
+                                        }
+                                        currentAvailability = newList
+                                        scope.launch {
+                                            try {
+                                                db.collection("trainers").document(trainer.id).update(mapOf("availability" to newList))
+                                            } catch (e: Exception) {
+                                                println("Gagal update availability: ${e.message}")
+                                            }
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = Color(0xFF3B82F6),
+                                        uncheckedColor = Color.Gray,
+                                        checkmarkColor = Color.White
+                                    )
+                                )
+                                Text(day, color = if (isAvailable) Color.White else Color.Gray, fontSize = 14.sp)
                             }
                         }
                     }

@@ -35,6 +35,10 @@ import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.Trainer
 import com.chiko0085.testgym.ui.theme.TextSub
+import com.chiko0085.testgym.db
+import com.chiko0085.testgym.getCurrentTimeMillis
+import com.chiko0085.testgym.openEmailClient
+import kotlinx.coroutines.launch
 
 private val NightBlack   = Color(0xFF080C14)
 private val DeepNavy     = Color(0xFF0A1628)
@@ -60,6 +64,7 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var isVisible by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { isVisible = true }
 
@@ -215,6 +220,13 @@ fun LoginScreen(
                             isError = errorMessage.isNotEmpty()
                         )
 
+                        // TOMBOL LUPA PASSWORD
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            TextButton(onClick = { showForgotPasswordDialog = true }) {
+                                Text("Lupa Password?", color = ArcBlue, fontSize = 12.sp)
+                            }
+                        }
+
                         AnimatedVisibility(
                             visible = errorMessage.isNotEmpty(),
                             enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -8 }
@@ -273,6 +285,103 @@ fun LoginScreen(
             }
         }
     }
+
+    if (showForgotPasswordDialog) {
+        ForgotPasswordDialog(
+            memberList = memberList,
+            onDismiss = { showForgotPasswordDialog = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ForgotPasswordDialog(
+    memberList: List<Member>,
+    onDismiss: () -> Unit
+) {
+    var emailInput by remember { mutableStateOf("") }
+    var resultMessage by remember { mutableStateOf<String?>(null) }
+    var isSuccess by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+    var isSending by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Lupa Password", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (resultMessage == null) {
+                    Text("Masukkan email yang terdaftar. Sistem akan mengirimkan Username dan Password Anda secara otomatis ke Gmail tersebut.", fontSize = 14.sp)
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !isSending
+                    )
+                    if (isSending) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sedang memproses...", fontSize = 12.sp, color = ArcBlue)
+                        }
+                    }
+                } else {
+                    Text(resultMessage!!, color = if (isSuccess) ElectricBlue else ErrorRed, fontSize = 14.sp)
+                }
+            }
+        },
+        confirmButton = {
+            if (resultMessage == null) {
+                    Button(
+                    onClick = {
+                        val member = memberList.find { it.email.equals(emailInput, ignoreCase = true) }
+                        if (member != null) {
+                            val subject = "Pemulihan Akun Youth Gym: ${member.name}"
+                            val body = """
+                                Halo,
+                                
+                                Berikut adalah informasi akun Youth Gym Anda:
+                                Username: ${member.username}
+                                Password: ${member.password}
+                                
+                                Silakan gunakan informasi ini untuk login kembali.
+                                Simpan pesan ini dengan baik.
+                                
+                                Salam,
+                                Youth Gym Team
+                            """.trimIndent()
+                            
+                            // MEMBUKA APLIKASI GMAIL/EMAIL SECARA OTOMATIS
+                            openEmailClient(
+                                recipient = member.email,
+                                subject = subject,
+                                body = body
+                            )
+                            
+                            resultMessage = "Berhasil! Aplikasi Email Anda akan terbuka. Silakan kirim pesan tersebut ke email Anda sendiri sebagai catatan."
+                            isSuccess = true
+                        } else {
+                            resultMessage = "Email tidak ditemukan! Pastikan email yang Anda masukkan benar atau hubungi Admin."
+                            isSuccess = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonBlue),
+                    enabled = !isSending && emailInput.isNotBlank()
+                ) { Text("Buka di Gmail", color = Color.White) }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Tutup") }
+            }
+        },
+        dismissButton = {
+            if (resultMessage == null) {
+                TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) }
+            }
+        }
+    )
 }
 
 @Composable

@@ -1,9 +1,7 @@
 package com.chiko0085.testgym
 
 import androidx.compose.runtime.*
-import com.chiko0085.testgym.model.Admin
-import com.chiko0085.testgym.model.GymPackage
-import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.model.*
 import com.chiko0085.testgym.ui.screens.AdminDashboard
 import com.chiko0085.testgym.ui.screens.LoginScreen
 import com.chiko0085.testgym.ui.screens.MemberMainScreen
@@ -20,6 +18,7 @@ fun App() {
         // Data global yang bersifat reactive
         val members = remember { mutableStateListOf<Member>() }
         val gymPackages = remember { mutableStateListOf<GymPackage>() }
+        val ptPackages = remember { mutableStateListOf<PtPackage>() }
         val trainers = remember { mutableStateListOf<Trainer>() }
         var totalRevenue by remember { mutableDoubleStateOf(0.0) }
         var adminAccount by remember { mutableStateOf(Admin()) }
@@ -43,7 +42,20 @@ fun App() {
                     ))
                 }
                 
-                // 3. Ambil Member
+                // 3. Ambil Paket PT
+                val dbPtPackages = db.collection("pt_packages").get().documents.map { it.data<PtPackage>() }
+                if (dbPtPackages.isNotEmpty()) {
+                    ptPackages.clear()
+                    ptPackages.addAll(dbPtPackages)
+                } else {
+                    ptPackages.addAll(listOf(
+                        PtPackage("1", "PT 5 Sesi", 500000.0, 5),
+                        PtPackage("2", "PT 10 Sesi", 900000.0, 10),
+                        PtPackage("3", "PT 20 Sesi", 1700000.0, 20)
+                    ))
+                }
+
+                // 4. Ambil Member
                 val dbMembers = db.collection("members").get().documents.map { it.data<Member>() }
                 members.clear()
                 members.addAll(dbMembers)
@@ -105,6 +117,7 @@ fun App() {
             "admin" -> AdminDashboard(
                 members = members,
                 gymPackages = gymPackages,
+                ptPackages = ptPackages,
                 trainers = trainers,
                 totalRevenue = totalRevenue,
                 adminAccount = adminAccount,
