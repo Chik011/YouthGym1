@@ -19,6 +19,7 @@ firebase-gitlive = "1.13.0"
 firebase-bom = "34.14.0"
 firebase-common-ktx = "21.0.0"
 firebase-firestore-google = "26.3.0"
+foundation = "1.11.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -45,6 +46,7 @@ codescanner = { module = "com.google.android.gms:play-services-code-scanner", ve
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebaseCommonKtxGoogle = { group = "com.google.firebase", name = "firebase-common-ktx", version.ref = "firebase-common-ktx" }
 firebaseFirestoreGoogle = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebase-firestore-google" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
