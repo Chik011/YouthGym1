@@ -19,9 +19,12 @@ package com.chiko0085.testgym.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import org.jetbrains.compose.resources.painterResource
+import io.kamel.image.KamelImage
+import io.kamel.image.asyncPainterResource
 // Import resource gambar dari folder commonMain/composeResources/drawable/
 import youthgym.shared.generated.resources.*
 import androidx.compose.foundation.layout.*
@@ -63,6 +66,9 @@ import com.chiko0085.testgym.db
 import com.chiko0085.testgym.formatEpochToDate
 // getCurrentTimeMillis: mendapatkan waktu saat ini dalam milidetik (cross-platform)
 import com.chiko0085.testgym.getCurrentTimeMillis
+import com.chiko0085.testgym.rememberImagePicker
+import com.chiko0085.testgym.isStorageSupported
+import com.chiko0085.testgym.createStorageData
 
 // --- IMPORT FIREBASE FIRESTORE ---
 import dev.gitlive.firebase.firestore.*
@@ -132,7 +138,8 @@ fun MemberMainScreen(
     initialMember: Member,
     memberList: List<Member>,
     onLogout: () -> Unit,
-    onUpdateMember: (Member) -> Unit
+    onUpdateMember: (Member) -> Unit,
+    onUpdatePhotoClick: (ByteArray) -> Unit
 ) {
     // State untuk melacak tab mana yang sedang aktif (default: tab 0 = Home)
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -184,7 +191,7 @@ fun MemberMainScreen(
                     NavigationBarItem(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                        icon = { Icon(Icons.Default.PhotoCamera, contentDescription = null) },
                         label = { Text("Scan") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = AccentBlue, selectedTextColor = AccentBlue,
@@ -300,7 +307,7 @@ fun MemberMainScreen(
                         }
                     }
                     3 -> AboutUsScreen()
-                    4 -> MemberProfileScreen(currentMember, onLogout)
+                    4 -> MemberProfileScreen(currentMember, onLogout, onUpdatePhotoClick)
                 }
             }
         }
@@ -375,8 +382,17 @@ fun MemberHomeScreen(member: Member) {
             // Menggunakan .snapshots.collect untuk "mendengarkan" perubahan secara live
             db.collection("trainers").snapshots.collect { snapshot ->
                 val dbTrainers = snapshot.documents.map { it.data<Trainer>() }
+                val updatedTrainers = dbTrainers.map { trainer ->
+                    val nameLower = trainer.name.lowercase()
+                    when {
+                        nameLower.contains("chiko") -> if (trainer.profileImageUrl.isEmpty()) trainer.copy(profileImageUrl = "res:pt_chiko") else trainer
+                        nameLower.contains("gabriel") -> if (trainer.profileImageUrl.isEmpty()) trainer.copy(profileImageUrl = "res:pt_gabriel") else trainer
+                        nameLower.contains("marchel") -> if (trainer.profileImageUrl.isEmpty()) trainer.copy(profileImageUrl = "res:pt_marchel") else trainer
+                        else -> trainer
+                    }
+                }
                 trainers.clear()
-                trainers.addAll(dbTrainers)
+                trainers.addAll(updatedTrainers)
             }
         } catch (e: Exception) {
             println("Gagal mendengarkan data trainer: ${e.message}")
@@ -412,8 +428,38 @@ fun MemberHomeScreen(member: Member) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // --- BAGIAN 1: SALAM SAMBUTAN ---
-            Text("Selamat Datang,", fontSize = 16.sp, color = TextSub)
-            Text(member.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("Selamat Datang,", fontSize = 16.sp, color = TextSub)
+                    Text(member.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                }
+
+                // Foto Profil Kecil di Dashboard
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(CardDark)
+                        .border(1.dp, AccentBlue, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (member.profileImageUrl.isNotEmpty()) {
+                        KamelImage(
+                            resource = asyncPainterResource(data = member.profileImageUrl),
+                            contentDescription = "Profile",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        val defaultIcon = if (member.gender == "Perempuan") Icons.Default.Face else Icons.Default.Person
+                        Icon(defaultIcon, null, tint = Color.Gray, modifier = Modifier.size(30.dp))
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(24.dp))
 
             // --- BAGIAN 2: KALENDER MINI ---
@@ -739,9 +785,38 @@ fun TrainerCard(trainer: Trainer, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            // Avatar lingkaran dengan ikon orang (placeholder)
-            Surface(shape = CircleShape, modifier = Modifier.size(64.dp), color = AccentBlue) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.padding(12.dp))
+            // Avatar lingkaran
+            Surface(shape = CircleShape, modifier = Modifier.size(64.dp), color = AccentBlue.copy(alpha = 0.2f)) {
+                if (trainer.profileImageUrl.isNotEmpty()) {
+                    if (trainer.profileImageUrl.startsWith("res:")) {
+                        val resourceName = trainer.profileImageUrl.removePrefix("res:")
+                        val painter = when {
+                            resourceName.contains("chiko") -> painterResource(Res.drawable.pt_chiko)
+                            resourceName.contains("gabriel") -> painterResource(Res.drawable.pt_gabriel)
+                            resourceName.contains("marchel") -> painterResource(Res.drawable.pt_marchel)
+                            else -> null
+                        }
+                        if (painter != null) {
+                            Image(
+                                painter = painter,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(Icons.Default.Person, null, tint = AccentBlue, modifier = Modifier.padding(12.dp))
+                        }
+                    } else {
+                        KamelImage(
+                            resource = asyncPainterResource(data = trainer.profileImageUrl),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                } else {
+                    Icon(Icons.Default.Person, null, tint = AccentBlue, modifier = Modifier.padding(12.dp))
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(trainer.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White, maxLines = 1)
@@ -778,7 +853,36 @@ fun TrainerProfileDialog(trainer: Trainer, onDismiss: () -> Unit, onContact: () 
                 // --- HEADER: Avatar + Nama + Spesialisasi ---
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(shape = CircleShape, modifier = Modifier.size(60.dp), color = AccentBlue.copy(alpha = 0.2f)) {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.padding(12.dp), tint = AccentBlue)
+                        if (trainer.profileImageUrl.isNotEmpty()) {
+                            if (trainer.profileImageUrl.startsWith("res:")) {
+                                val resourceName = trainer.profileImageUrl.removePrefix("res:")
+                                val painter = when {
+                                    resourceName.contains("chiko") -> painterResource(Res.drawable.pt_chiko)
+                                    resourceName.contains("gabriel") -> painterResource(Res.drawable.pt_gabriel)
+                                    resourceName.contains("marchel") -> painterResource(Res.drawable.pt_marchel)
+                                    else -> null
+                                }
+                                if (painter != null) {
+                                    Image(
+                                        painter = painter,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Person, null, modifier = Modifier.padding(12.dp), tint = AccentBlue)
+                                }
+                            } else {
+                                KamelImage(
+                                    resource = asyncPainterResource(data = trainer.profileImageUrl),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        } else {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.padding(12.dp), tint = AccentBlue)
+                        }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -1200,14 +1304,27 @@ fun FacilityGallery(images: List<org.jetbrains.compose.resources.DrawableResourc
  * @param onLogout Callback yang dipanggil saat tombol logout ditekan
  */
 @Composable
-fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
+fun MemberProfileScreen(member: Member, onLogout: () -> Unit, onUpdatePhotoClick: (ByteArray) -> Unit) {
     // CoroutineScope untuk operasi async (update Firebase)
     val scope = rememberCoroutineScope()
+    var isUploading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(member.profileImageUrl) {
+        isUploading = false
+    }
+
+    val launchImagePicker = rememberImagePicker(
+        onResult = { imageBytes ->
+            isUploading = true
+            onUpdatePhotoClick(imageBytes)
+        }
+    )
 
     // State form Data Diri
     var name by remember { mutableStateOf(member.name) }
     var weight by remember { mutableStateOf(if ((member.weight ?: 0.0) > 0) (member.weight?.toString() ?: "") else "") }
     var height by remember { mutableStateOf(if ((member.height ?: 0.0) > 0) (member.height?.toString() ?: "") else "") }
+    var gender by remember { mutableStateOf(member.gender) }
 
     // State form Keamanan Akun
     var username by remember { mutableStateOf(member.username) }
@@ -1237,7 +1354,8 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
             weight = updatedWeight,
             height = updatedHeight,
             username = username,
-            password = password
+            password = password,
+            gender = gender
         )
 
         scope.launch {
@@ -1249,6 +1367,7 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
                 member.height = updatedHeight
                 member.username = username
                 member.password = password
+                member.gender = gender
 
                 snackbarHostState.showSnackbar("Data berhasil disimpan!")
             } catch (e: Exception) {
@@ -1271,9 +1390,42 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             // --- AVATAR LINGKARAN ---
-            Surface(modifier = Modifier.size(80.dp), shape = CircleShape, color = AccentBlue.copy(alpha = 0.2f)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Person, null, modifier = Modifier.size(50.dp), tint = AccentBlue)
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Surface(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .border(2.dp, AccentBlue, CircleShape),
+                    shape = CircleShape,
+                    color = AccentBlue.copy(alpha = 0.2f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (isUploading) {
+                            CircularProgressIndicator(color = AccentBlue, modifier = Modifier.size(30.dp))
+                        } else if (member.profileImageUrl.isNotEmpty()) {
+                            KamelImage(
+                                resource = asyncPainterResource(data = member.profileImageUrl),
+                                contentDescription = "Profile",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val defaultIcon = if (gender == "Perempuan") Icons.Default.Face else Icons.Default.Person
+                            Icon(defaultIcon, null, modifier = Modifier.size(60.dp), tint = AccentBlue)
+                        }
+                    }
+                }
+
+                // Tombol Edit Foto
+                Surface(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .offset(x = 4.dp, y = 4.dp)
+                        .clickable { launchImagePicker() },
+                    shape = CircleShape,
+                    color = AccentBlue,
+                    border = androidx.compose.foundation.BorderStroke(2.dp, CardDark)
+                ) {
+                    Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.padding(6.dp))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -1306,6 +1458,43 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
             )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Pilih Gender (Icon based)
+            Text("Pilih Icon Profil / Gender", color = Color.White, fontSize = 14.sp, modifier = Modifier.align(Alignment.Start))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Opsi Laki-laki
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (gender == "Laki-laki") AccentBlue.copy(alpha = 0.2f) else Color.Transparent)
+                        .border(1.dp, if (gender == "Laki-laki") AccentBlue else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .clickable { gender = "Laki-laki" }
+                        .padding(12.dp)
+                ) {
+                    Icon(Icons.Default.Person, null, tint = if (gender == "Laki-laki") AccentBlue else Color.Gray)
+                    Text("Laki-laki", color = if (gender == "Laki-laki") Color.White else Color.Gray, fontSize = 12.sp)
+                }
+                // Opsi Perempuan
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (gender == "Perempuan") Color(0xFFEC4899).copy(alpha = 0.2f) else Color.Transparent)
+                        .border(1.dp, if (gender == "Perempuan") Color(0xFFEC4899) else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .clickable { gender = "Perempuan" }
+                        .padding(12.dp)
+                ) {
+                    Icon(Icons.Default.Face, null, tint = if (gender == "Perempuan") Color(0xFFEC4899) else Color.Gray)
+                    Text("Perempuan", color = if (gender == "Perempuan") Color.White else Color.Gray, fontSize = 12.sp)
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

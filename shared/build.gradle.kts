@@ -74,7 +74,7 @@ kotlin {
 
             // Kamel dan Firebase Storage tetap di commonMain
             implementation("media.kamel:kamel-image:0.9.5")
-            implementation("dev.gitlive:firebase-storage:1.10.4")
+            api(libs.firebase.storage)
 
             api(libs.firebase.firestore)
             api(libs.firebase.common)

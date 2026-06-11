@@ -39,6 +39,10 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 import com.chiko0085.testgym.Trainer
 import com.chiko0085.testgym.model.Reservation
+import org.jetbrains.compose.resources.painterResource
+import youthgym.shared.generated.resources.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 
 // Primary Colors dari Theme
 val DarkBgStart = Color(0xFF0F172A)
@@ -51,7 +55,7 @@ val AccentBlue = Color(0xFF3B82F6)
 fun AdminDashboard(
     members: MutableList<Member>,
     gymPackages: SnapshotStateList<GymPackage>,
-    ptPackages: SnapshotStateList<PtPackage>, // Tambahan parameter baru
+    ptPackages: SnapshotStateList<PtPackage>,
     trainers: SnapshotStateList<Trainer>,
     totalRevenue: Double,
     adminAccount: Admin,
@@ -72,198 +76,214 @@ fun AdminDashboard(
     var showResetDialog by remember { mutableStateOf(false) }
     var snackbarHostState = remember { SnackbarHostState() }
 
-    // --- STATE BARU UNTUK FILTER EXCEL ---
-    var filterExpanded by remember { mutableStateOf(false) }
-    var selectedFilterText by remember { mutableStateOf("Semua Waktu") }
-    val filterOptions = listOf(
-        "Semua Waktu", "1 Bulan Terakhir", "2 Bulan Terakhir", "3 Bulan Terakhir",
-        "4 Bulan Terakhir", "5 Bulan Terakhir", "6 Bulan Terakhir", "7 Bulan Terakhir",
-        "8 Bulan Terakhir", "9 Bulan Terakhir", "10 Bulan Terakhir", "11 Bulan Terakhir", "1 Tahun Terakhir"
-    )
-
     val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    // Logic Switch Screen
-    when (currentScreen) {
-        "members" -> MemberManagementScreen(
-            members = members,
-            gymPackages = gymPackages,
-            ptPackages = ptPackages, // Tambahkan ini
-            onCheckIn = { memberToCheckIn = it },
-            onEdit = { memberToEdit = it },
-            onDelete = { memberToDelete = it },
-            onAddMember = { showAddDialog = true },
-            onUpdateRevenue = onUpdateRevenue,
-            totalRevenue = totalRevenue,
-            onBack = { currentScreen = "dashboard" }
-        )
-        "packages" -> PackageManagementScreen(gymPackages, onBack = { currentScreen = "dashboard" })
-        "pt_packages" -> PtPackageManagementScreen(ptPackages, onBack = { currentScreen = "dashboard" })
-        "trainers" -> TrainerManagementScreen(trainers, onBack = { currentScreen = "dashboard" })
-        "reservations" -> ReservationManagementScreen(onBack = { currentScreen = "dashboard" })
-        "profile" -> AdminProfileScreen(adminAccount, onUpdateAdmin, onBack = { currentScreen = "dashboard" })
-        else -> {
-            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
+        val isDesktop = maxWidth > 800.dp
+
+        if (isDesktop) {
+            // --- LAYOUT DESKTOP (Side Navigation) ---
+            Row(modifier = Modifier.fillMaxSize()) {
+                NavigationRail(
+                    containerColor = Color.Black.copy(alpha = 0.3f),
+                    header = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 16.dp)) {
+                            Icon(Icons.Default.AccountCircle, "Admin", tint = AccentBlue, modifier = Modifier.size(40.dp))
+                            Text("Admin", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                ) {
+                    val navItems = listOf(
+                        Triple("dashboard", "Home", Icons.Default.Home),
+                        Triple("members", "Member", Icons.Default.Person),
+                        Triple("packages", "Paket Gym", Icons.Default.ShoppingCart),
+                        Triple("pt_packages", "Paket PT", Icons.Default.Star),
+                        Triple("trainers", "Trainer", Icons.Default.Face),
+                        Triple("reservations", "Padel", Icons.Default.DateRange),
+                        Triple("profile", "Settings", Icons.Default.Settings)
+                    )
+
+                    navItems.forEach { (screen, label, icon) ->
+                        NavigationRailItem(
+                            selected = currentScreen == screen,
+                            onClick = { currentScreen = screen },
+                            icon = { Icon(icon, null) },
+                            label = { Text(label, fontSize = 10.sp) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = AccentBlue,
+                                unselectedIconColor = Color.LightGray,
+                                selectedTextColor = AccentBlue,
+                                unselectedTextColor = Color.LightGray,
+                                indicatorColor = AccentBlue.copy(alpha = 0.1f)
+                            )
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    NavigationRailItem(
+                        selected = false,
+                        onClick = onLogout,
+                        icon = { Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFF87171)) },
+                        label = { Text("Logout", color = Color(0xFFF87171), fontSize = 10.sp) }
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    AdminContent(
+                        currentScreen = currentScreen,
+                        members = members,
+                        gymPackages = gymPackages,
+                        ptPackages = ptPackages,
+                        trainers = trainers,
+                        totalRevenue = totalRevenue,
+                        adminAccount = adminAccount,
+                        onUpdateAdmin = onUpdateAdmin,
+                        onUpdateRevenue = onUpdateRevenue,
+                        onLogout = onLogout,
+                        onNavigate = { currentScreen = it },
+                        onCheckIn = { memberToCheckIn = it },
+                        onEditMember = { memberToEdit = it },
+                        onDeleteMember = { memberToDelete = it },
+                        onAddMember = { showAddDialog = true },
+                        onResetRevenue = { showResetDialog = true },
+                        onTrainerSchedule = { trainerForSchedule = it },
+                        snackbarHostState = snackbarHostState,
+                        isDesktop = true
+                    )
+                }
+            }
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet(
+                        drawerContainerColor = CardDark,
+                        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+                    ) {
+                        Spacer(Modifier.height(24.dp))
+                        Column(Modifier.padding(24.dp)) {
+                            Text("Admin Panel", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Youth Gym Management", fontSize = 14.sp, color = Color.LightGray)
+                        }
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                        
+                        val navItems = listOf(
+                            Triple("dashboard", "Dashboard Home", Icons.Default.Home),
+                            Triple("members", "Kelola Member", Icons.Default.Person),
+                            Triple("packages", "Harga Paket Gym", Icons.Default.ShoppingCart),
+                            Triple("pt_packages", "Harga Paket PT", Icons.Default.Star),
+                            Triple("trainers", "Daftar Trainer", Icons.Default.Face),
+                            Triple("reservations", "Jadwal Padel", Icons.Default.DateRange),
+                            Triple("profile", "Pengaturan Akun", Icons.Default.Settings)
+                        )
+
+                        navItems.forEach { (screen, label, icon) ->
+                            NavigationDrawerItem(
+                                label = { Text(label) },
+                                selected = currentScreen == screen,
+                                onClick = {
+                                    currentScreen = screen
+                                    scope.launch { drawerState.close() }
+                                },
+                                icon = { Icon(icon, null) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = Color.Transparent,
+                                    selectedContainerColor = AccentBlue.copy(alpha = 0.1f),
+                                    selectedTextColor = AccentBlue,
+                                    unselectedTextColor = Color.LightGray,
+                                    selectedIconColor = AccentBlue,
+                                    unselectedIconColor = Color.LightGray
+                                ),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.weight(1f))
+                        NavigationDrawerItem(
+                            label = { Text("Keluar (Logout)") },
+                            selected = false,
+                            onClick = onLogout,
+                            icon = { Icon(Icons.Default.ExitToApp, null) },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = Color(0xFFF87171), 
+                                unselectedIconColor = Color(0xFFF87171),
+                                selectedTextColor = Color(0xFFF87171),
+                                selectedIconColor = Color(0xFFF87171),
+                                unselectedContainerColor = Color.Transparent,
+                                selectedContainerColor = Color.Transparent
+                            ),
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+            ) {
                 Scaffold(
                     containerColor = Color.Transparent,
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
                         TopAppBar(
                             title = {
-                                Column {
-                                    Text("Admin Panel", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                                    Text("Youth Gym Management", fontSize = 12.sp, color = Color.LightGray)
-                                }
+                                Text(
+                                    text = when(currentScreen) {
+                                        "dashboard" -> "Admin Home"
+                                        "members" -> "Member Gym"
+                                        "packages" -> "Paket Gym"
+                                        "pt_packages" -> "Paket PT"
+                                        "trainers" -> "Personal Trainer"
+                                        "reservations" -> "Jadwal Padel"
+                                        else -> "Profil Admin"
+                                    },
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             },
-                            actions = {
-                                // 🌟 KODE BARU: TOMBOL MENU MEMBER DI TOP BAR
-                                TextButton(onClick = { currentScreen = "members" }) {
-                                    Text("Member", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            navigationIcon = {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, "Menu", tint = Color.White)
                                 }
-                                TextButton(onClick = { currentScreen = "packages" }) {
-                                    Text("Paket", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                TextButton(onClick = { currentScreen = "pt_packages" }) {
-                                    Text("Paket PT", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                TextButton(onClick = { currentScreen = "trainers" }) {
-                                    Text("Trainer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                TextButton(onClick = { currentScreen = "reservations" }) {
-                                    Text("Padel", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                IconButton(onClick = { currentScreen = "profile" }) {
-                                    Icon(Icons.Default.Settings, "Profil", tint = Color.White)
-                                }
-                                IconButton(onClick = onLogout) { Icon(Icons.Default.ExitToApp, "Logout", tint = Color(0xFFF87171)) }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                         )
                     }
                 ) { padding ->
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            // Card Ringkasan
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(24.dp),
-                                colors = CardDefaults.cardColors(containerColor = AccentBlue.copy(alpha = 0.9f))
-                            ) {
-                                Column(modifier = Modifier.padding(24.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text("Total Revenue", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
-                                    }
-                                    Text("Rp ${formatRupiah(totalRevenue)}", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
-                                        TextButton(onClick = { showResetDialog = true }) {
-                                            Icon(Icons.Default.Refresh, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Reset Pendapatan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                                        }
-                                    }
-
-                                    // --- KODE FILTER DROPDOWN INTERAKTIF ---
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("Rentang Filter Excel:", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                                        Box {
-                                            TextButton(
-                                                onClick = { filterExpanded = true },
-                                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.background(Color.White.copy(alpha = 0.15f))
-                                            ) {
-                                                Text(selectedFilterText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
-                                            }
-                                            DropdownMenu(
-                                                expanded = filterExpanded,
-                                                onDismissRequest = { filterExpanded = false }
-                                            ) {
-                                                filterOptions.forEach { option ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(option) },
-                                                        onClick = {
-                                                            selectedFilterText = option
-                                                            filterExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Button(
-                                        onClick = {
-                                            val nowTime = getCurrentTimeMillis()
-                                            val filteredForExcel = when (selectedFilterText) {
-                                                "1 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (1 * 30 * 86400000L) }
-                                                "2 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (2 * 30 * 86400000L) }
-                                                "3 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (3 * 30 * 86400000L) }
-                                                "4 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (4 * 30 * 86400000L) }
-                                                "5 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (5 * 30 * 86400000L) }
-                                                "6 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (6 * 30 * 86400000L) }
-                                                "7 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (7 * 30 * 86400000L) }
-                                                "8 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (8 * 30 * 86400000L) }
-                                                "9 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (9 * 30 * 86400000L) }
-                                                "10 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (10 * 30 * 86400000L) }
-                                                "11 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (11 * 30 * 86400000L) }
-                                                "1 Tahun Terakhir" -> members.filter { it.joinDate >= nowTime - (365 * 86400000L) }
-                                                else -> members
-                                            }
-
-                                            val html = generateRevenueHtml(filteredForExcel, selectedFilterText)
-                                            exportToExcel(html)
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("Laporan ($selectedFilterText) berhasil diunduh")
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, tint = AccentBlue)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Unduh Laporan Excel (CSV)", color = AccentBlue, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-
-                        item { CalendarCard() }
-
-                        // 🌟 LIST MEMBER SUDAH DIHAPUS DARI HOME UTAMA, DIGANTI DAN DISEDERHANAKAN DI SINI
-                        item {
-                            Text("Personal Trainer Aktif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
-                            TrainerListRow(trainers, onTrainerClick = { trainerForSchedule = it })
-                        }
-
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                        AdminContent(
+                            currentScreen = currentScreen,
+                            members = members,
+                            gymPackages = gymPackages,
+                            ptPackages = ptPackages,
+                            trainers = trainers,
+                            totalRevenue = totalRevenue,
+                            adminAccount = adminAccount,
+                            onUpdateAdmin = onUpdateAdmin,
+                            onUpdateRevenue = onUpdateRevenue,
+                            onLogout = onLogout,
+                            onNavigate = { currentScreen = it },
+                            onCheckIn = { memberToCheckIn = it },
+                            onEditMember = { memberToEdit = it },
+                            onDeleteMember = { memberToDelete = it },
+                            onAddMember = { showAddDialog = true },
+                            onResetRevenue = { showResetDialog = true },
+                            onTrainerSchedule = { trainerForSchedule = it },
+                            snackbarHostState = snackbarHostState,
+                            isDesktop = false
+                        )
                     }
                 }
             }
         }
     }
 
-    // --- DIALOG KONFIRMASI RESET PENDAPATAN ---
+    // --- DIALOGS (Tetap sama) ---
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset Pendapatan?") },
-            text = { Text("Tindakan ini akan menghapus histori pembayaran semua member di database. Member tetap ada, namun nilai pembayaran mereka akan menjadi 0. Lanjutkan?") },
+            containerColor = CardDark,
+            title = { Text("Reset Pendapatan?", color = Color.White) },
+            text = { Text("Tindakan ini akan menghapus histori pembayaran semua member di database. Member tetap ada, namun nilai pembayaran mereka akan menjadi 0. Lanjutkan?", color = Color.LightGray) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -290,12 +310,12 @@ fun AdminDashboard(
         )
     }
 
-    // --- DIALOG KONFIRMASI CHECK-IN ---
     if (memberToCheckIn != null) {
         AlertDialog(
             onDismissRequest = { memberToCheckIn = null },
-            title = { Text("Konfirmasi Check-in") },
-            text = { Text("Apakah Anda yakin ingin melakukan check-in untuk ${memberToCheckIn?.name}? Sisa hari akan berkurang 1.") },
+            containerColor = CardDark,
+            title = { Text("Konfirmasi Check-in", color = Color.White) },
+            text = { Text("Apakah Anda yakin ingin melakukan check-in untuk ${memberToCheckIn?.name}? Sisa hari akan berkurang 1.", color = Color.LightGray) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -325,7 +345,6 @@ fun AdminDashboard(
         )
     }
 
-    // --- DIALOG TAMBAH MEMBER ---
     if (showAddDialog) {
         AddMemberDialog(
             packages = gymPackages,
@@ -381,7 +400,6 @@ fun AdminDashboard(
         )
     }
 
-    // --- DIALOG UPDATE MEMBER ---
     if (memberToEdit != null) {
         EditMemberDialog(
             member = memberToEdit!!,
@@ -404,7 +422,8 @@ fun AdminDashboard(
                             "joinDate" to updated.joinDate,
                             "expiredDate" to updated.expiredDate,
                             "weight" to updated.weight,
-                            "height" to updated.height
+                            "height" to updated.height,
+                            "gender" to updated.gender
                         )
                         db.collection("members").document(updated.id).update(data)
                     } catch (e: Exception) {}
@@ -413,12 +432,12 @@ fun AdminDashboard(
         )
     }
 
-    // --- DIALOG DELETE MEMBER ---
     if (memberToDelete != null) {
         AlertDialog(
             onDismissRequest = { memberToDelete = null },
-            title = { Text("Hapus Member") },
-            text = { Text("Yakin ingin menghapus ${memberToDelete?.name} dari Database?") },
+            containerColor = CardDark,
+            title = { Text("Hapus Member", color = Color.White) },
+            text = { Text("Yakin ingin menghapus ${memberToDelete?.name} dari Database?", color = Color.LightGray) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -435,150 +454,354 @@ fun AdminDashboard(
         )
     }
 
-    // --- DIALOG TAMBAH JADWAL TRAINER ---
     if (trainerForSchedule != null) {
-        var dayText by remember { mutableStateOf("") }
-        var timeText by remember { mutableStateOf("") }
-        var selectedMemberName by remember { mutableStateOf("Pilih Member") }
-        var memberDropdownExpanded by remember { mutableStateOf(false) }
-        var dayDropdownExpanded by remember { mutableStateOf(false) }
-        var editingIndex by remember { mutableStateOf<Int?>(null) }
+        TrainerScheduleDialog(
+            trainer = trainerForSchedule!!,
+            trainers = trainers,
+            members = members,
+            onDismiss = { trainerForSchedule = null },
+            onUpdateTrainer = { trainerForSchedule = it },
+            snackbarHostState = snackbarHostState
+        )
+    }
+}
 
-        val availableDays = trainerForSchedule?.availability ?: listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
+/**
+ * Komponen Konten Admin yang bisa berganti layar
+ */
+@Composable
+fun AdminContent(
+    currentScreen: String,
+    members: MutableList<Member>,
+    gymPackages: SnapshotStateList<GymPackage>,
+    ptPackages: SnapshotStateList<PtPackage>,
+    trainers: SnapshotStateList<Trainer>,
+    totalRevenue: Double,
+    adminAccount: Admin,
+    onUpdateAdmin: (Admin) -> Unit,
+    onUpdateRevenue: (Double) -> Unit,
+    onLogout: () -> Unit,
+    onNavigate: (String) -> Unit,
+    onCheckIn: (Member) -> Unit,
+    onEditMember: (Member) -> Unit,
+    onDeleteMember: (Member) -> Unit,
+    onAddMember: () -> Unit,
+    onResetRevenue: () -> Unit,
+    onTrainerSchedule: (Trainer) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    isDesktop: Boolean
+) {
+    when (currentScreen) {
+        "members" -> MemberManagementScreen(
+            members = members,
+            gymPackages = gymPackages,
+            ptPackages = ptPackages,
+            onCheckIn = onCheckIn,
+            onEdit = onEditMember,
+            onDelete = onDeleteMember,
+            onAddMember = onAddMember,
+            onUpdateRevenue = onUpdateRevenue,
+            totalRevenue = totalRevenue,
+            onBack = { onNavigate("dashboard") }
+        )
+        "packages" -> PackageManagementScreen(gymPackages, onBack = { onNavigate("dashboard") })
+        "pt_packages" -> PtPackageManagementScreen(ptPackages, onBack = { onNavigate("dashboard") })
+        "trainers" -> TrainerManagementScreen(trainers, onBack = { onNavigate("dashboard") })
+        "reservations" -> ReservationManagementScreen(onBack = { onNavigate("dashboard") })
+        "profile" -> AdminProfileScreen(adminAccount, onUpdateAdmin, onBack = { onNavigate("dashboard") })
+        else -> AdminHomeScreen(
+            members = members,
+            trainers = trainers,
+            totalRevenue = totalRevenue,
+            onResetRevenue = onResetRevenue,
+            onTrainerClick = onTrainerSchedule,
+            snackbarHostState = snackbarHostState,
+            isDesktop = isDesktop
+        )
+    }
+}
 
-        AlertDialog(
-            onDismissRequest = { trainerForSchedule = null },
-            title = { Text("Kelola Jadwal: Coach ${trainerForSchedule?.name}") },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    Text("Daftar Jadwal:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
+@Composable
+fun AdminHomeScreen(
+    members: List<Member>,
+    trainers: SnapshotStateList<Trainer>,
+    totalRevenue: Double,
+    onResetRevenue: () -> Unit,
+    onTrainerClick: (Trainer) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    isDesktop: Boolean
+) {
+    var filterExpanded by remember { mutableStateOf(false) }
+    var selectedFilterText by remember { mutableStateOf("Semua Waktu") }
+    val filterOptions = listOf(
+        "Semua Waktu", "1 Bulan Terakhir", "2 Bulan Terakhir", "3 Bulan Terakhir",
+        "4 Bulan Terakhir", "5 Bulan Terakhir", "6 Bulan Terakhir", "7 Bulan Terakhir",
+        "8 Bulan Terakhir", "9 Bulan Terakhir", "10 Bulan Terakhir", "11 Bulan Terakhir", "1 Tahun Terakhir"
+    )
+    val scope = rememberCoroutineScope()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = if(isDesktop) 32.dp else 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            // Card Ringkasan
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AccentBlue.copy(alpha = 0.9f))
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Total Revenue", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                    }
+                    Text("Rp ${formatRupiah(totalRevenue)}", color = Color.White, fontSize = if(isDesktop) 42.sp else 28.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
+                        TextButton(onClick = onResetRevenue) {
+                            Icon(Icons.Default.Refresh, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Reset Pendapatan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                        }
+                    }
 
-                    Box(modifier = Modifier.heightIn(max = 150.dp)) {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val currentSchedules = trainerForSchedule?.schedules ?: emptyList()
-                            itemsIndexed(currentSchedules) { index, schedule ->
-                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)) {
-                                    Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(schedule, fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                                        Row {
-                                            IconButton(onClick = {
-                                                try {
-                                                    val parts = schedule.split(", ", " - ")
-                                                    if(parts.size >= 3) {
-                                                        dayText = parts[0]
-                                                        timeText = parts[1]
-                                                        selectedMemberName = parts[2].replace("Melatih ", "")
-                                                    } else {
-                                                        dayText = schedule
-                                                    }
-                                                } catch(e: Exception) { dayText = schedule }
-                                                editingIndex = index
-                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp)) }
-                                            IconButton(onClick = {
-                                                val trainer = trainerForSchedule!!
-                                                val newList = trainer.schedules.toMutableList()
-                                                newList.removeAt(index)
-                                                val updated = trainer.copy(schedules = newList)
-                                                scope.launch {
-                                                    db.collection("trainers").document(trainer.id).update(mapOf("schedules" to newList))
-                                                    val idx = trainers.indexOfFirst { it.id == trainer.id }
-                                                    if (idx != -1) trainers[idx] = updated
-                                                    trainerForSchedule = updated
-                                                }
-                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp)) }
+                    // --- KODE FILTER DROPDOWN INTERAKTIF ---
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Rentang Filter Excel:", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        Box {
+                            TextButton(
+                                onClick = { filterExpanded = true },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.background(Color.White.copy(alpha = 0.15f))
+                            ) {
+                                Text(selectedFilterText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+                            }
+                            DropdownMenu(
+                                expanded = filterExpanded,
+                                onDismissRequest = { filterExpanded = false }
+                            ) {
+                                filterOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            selectedFilterText = option
+                                            filterExpanded = false
                                         }
-                                    }
+                                    )
                                 }
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text("Form Jadwal Baru:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AccentBlue)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Dropdown Hari yang menyesuaikan Availability PT
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = dayText, onValueChange = {}, label = { Text("Pilih Hari") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = { IconButton(onClick = { dayDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } },
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
-                        )
-                        DropdownMenu(expanded = dayDropdownExpanded, onDismissRequest = { dayDropdownExpanded = false }) {
-                            listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu").forEach { day ->
-                                val isAvailable = availableDays.contains(day)
-                                DropdownMenuItem(
-                                    text = { 
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(day, color = if(isAvailable) Color.Black else Color.Gray)
-                                            if(!isAvailable) {
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("(PT Tidak Tersedia)", color = Color.Red, fontSize = 10.sp)
-                                            }
-                                        }
-                                    }, 
-                                    onClick = { 
-                                        if(isAvailable) {
-                                            dayText = day
-                                            dayDropdownExpanded = false 
-                                        }
-                                    },
-                                    enabled = isAvailable
-                                )
+                    Button(
+                        onClick = {
+                            val nowTime = getCurrentTimeMillis()
+                            val filteredForExcel = when (selectedFilterText) {
+                                "1 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (1 * 30 * 86400000L) }
+                                "2 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (2 * 30 * 86400000L) }
+                                "3 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (3 * 30 * 86400000L) }
+                                "4 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (4 * 30 * 86400000L) }
+                                "5 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (5 * 30 * 86400000L) }
+                                "6 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (6 * 30 * 86400000L) }
+                                "7 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (7 * 30 * 86400000L) }
+                                "8 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (8 * 30 * 86400000L) }
+                                "9 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (9 * 30 * 86400000L) }
+                                "10 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (10 * 30 * 86400000L) }
+                                "11 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (11 * 30 * 86400000L) }
+                                "1 Tahun Terakhir" -> members.filter { it.joinDate >= nowTime - (365 * 86400000L) }
+                                else -> members
                             }
-                        }
+
+                            val html = generateRevenueHtml(filteredForExcel, selectedFilterText)
+                            exportToExcel(html)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Laporan ($selectedFilterText) berhasil diunduh")
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, tint = AccentBlue)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Unduh Laporan Excel (CSV)", color = AccentBlue, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = timeText, onValueChange = { timeText = it }, label = { Text("Jam (Cth: 10:00 WIB)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White))
-                    Spacer(modifier = Modifier.height(8.dp))
+        item { CalendarCard() }
 
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = selectedMemberName, onValueChange = {}, label = { Text("Pilih Member") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = { IconButton(onClick = { memberDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } },
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
-                        )
-                        DropdownMenu(expanded = memberDropdownExpanded, onDismissRequest = { memberDropdownExpanded = false }) {
-                            members.forEach { m -> DropdownMenuItem(text = { Text(m.name) }, onClick = { selectedMemberName = m.name; memberDropdownExpanded = false }) }
+        item {
+            Text("Personal Trainer Aktif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))
+            TrainerListRow(trainers, onTrainerClick = onTrainerClick)
+        }
+
+        item { Spacer(modifier = Modifier.height(if(isDesktop) 32.dp else 80.dp)) }
+    }
+}
+
+@Composable
+fun TrainerScheduleDialog(
+    trainer: Trainer,
+    trainers: SnapshotStateList<Trainer>,
+    members: List<Member>,
+    onDismiss: () -> Unit,
+    onUpdateTrainer: (Trainer) -> Unit,
+    snackbarHostState: SnackbarHostState
+) {
+    var dayText by remember { mutableStateOf("") }
+    var timeText by remember { mutableStateOf("") }
+    var selectedMemberName by remember { mutableStateOf("Pilih Member") }
+    var memberDropdownExpanded by remember { mutableStateOf(false) }
+    var dayDropdownExpanded by remember { mutableStateOf(false) }
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val availableDays = trainer.availability
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text("Kelola Jadwal: Coach ${trainer.name}", color = Color.White) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text("Daftar Jadwal:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(modifier = Modifier.heightIn(max = 200.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val currentSchedules = trainer.schedules
+                        itemsIndexed(currentSchedules) { index, schedule ->
+                            Card(colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)), shape = RoundedCornerShape(8.dp)) {
+                                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(schedule, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                    Row {
+                                        IconButton(onClick = {
+                                            try {
+                                                val parts = schedule.split(", ", " - ")
+                                                if(parts.size >= 3) {
+                                                    dayText = parts[0]
+                                                    timeText = parts[1]
+                                                    selectedMemberName = parts[2].replace("Melatih ", "")
+                                                } else {
+                                                    dayText = schedule
+                                                }
+                                            } catch(e: Exception) { dayText = schedule }
+                                            editingIndex = index
+                                        }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp)) }
+                                        IconButton(onClick = {
+                                            val newList = trainer.schedules.toMutableList()
+                                            newList.removeAt(index)
+                                            val updated = trainer.copy(schedules = newList)
+                                            scope.launch {
+                                                db.collection("trainers").document(trainer.id).update(mapOf("schedules" to newList))
+                                                val idx = trainers.indexOfFirst { it.id == trainer.id }
+                                                if (idx != -1) trainers[idx] = updated
+                                                onUpdateTrainer(updated)
+                                            }
+                                        }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp)) }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (dayText.isNotBlank() && timeText.isNotBlank() && selectedMemberName != "Pilih Member") {
-                            val trainer = trainerForSchedule!!
-                            val newList = trainer.schedules.toMutableList()
-                            val formattedSchedule = "$dayText, $timeText - Melatih $selectedMemberName"
 
-                            if (editingIndex != null) { newList[editingIndex!!] = formattedSchedule } else { newList.add(formattedSchedule) }
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                            val updated = trainer.copy(schedules = newList)
-                            scope.launch {
-                                try {
-                                    db.collection("trainers").document(trainer.id).update(mapOf("schedules" to newList))
-                                    val idx = trainers.indexOfFirst { it.id == trainer.id }
-                                    if (idx != -1) trainers[idx] = updated
-                                    dayText = ""; timeText = ""; selectedMemberName = "Pilih Member"
-                                    editingIndex = null
-                                    trainerForSchedule = updated
-                                    snackbarHostState.showSnackbar("Berhasil!")
-                                } catch (e: Exception) { snackbarHostState.showSnackbar("Gagal: ${e.message}") }
-                            }
+                Text("Form Jadwal Baru:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AccentBlue)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = dayText, onValueChange = {}, label = { Text("Pilih Hari") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { dayDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null, tint = Color.White) } },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray)
+                    )
+                    DropdownMenu(expanded = dayDropdownExpanded, onDismissRequest = { dayDropdownExpanded = false }, modifier = Modifier.background(CardDark)) {
+                        listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu").forEach { day ->
+                            val isAvailable = availableDays.contains(day)
+                            DropdownMenuItem(
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(day, color = if(isAvailable) Color.White else Color.Gray)
+                                        if(!isAvailable) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("(PT Tidak Tersedia)", color = Color.Red, fontSize = 10.sp)
+                                        }
+                                    }
+                                }, 
+                                onClick = { 
+                                    if(isAvailable) {
+                                        dayText = day
+                                        dayDropdownExpanded = false 
+                                    }
+                                },
+                                enabled = isAvailable
+                            )
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                ) { Text(if (editingIndex != null) "Update" else "Tambah", color = Color.White) }
-            },
-            dismissButton = { TextButton(onClick = { trainerForSchedule = null }) { Text("Tutup", color = Color.Gray) } }
-        )
-    }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = timeText, onValueChange = { timeText = it }, label = { Text("Jam (Cth: 10:00 WIB)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedMemberName, onValueChange = {}, label = { Text("Pilih Member") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { memberDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null, tint = Color.White) } },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, unfocusedBorderColor = Color.Gray)
+                    )
+                    DropdownMenu(expanded = memberDropdownExpanded, onDismissRequest = { memberDropdownExpanded = false }, modifier = Modifier.background(CardDark)) {
+                        members.forEach { m -> DropdownMenuItem(text = { Text(m.name, color = Color.White) }, onClick = { selectedMemberName = m.name; memberDropdownExpanded = false }) }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (dayText.isNotBlank() && timeText.isNotBlank() && selectedMemberName != "Pilih Member") {
+                        val newList = trainer.schedules.toMutableList()
+                        val formattedSchedule = "$dayText, $timeText - Melatih $selectedMemberName"
+
+                        if (editingIndex != null) { newList[editingIndex!!] = formattedSchedule } else { newList.add(formattedSchedule) }
+
+                        val updated = trainer.copy(schedules = newList)
+                        scope.launch {
+                            try {
+                                db.collection("trainers").document(trainer.id).update(mapOf("schedules" to newList))
+                                val idx = trainers.indexOfFirst { it.id == trainer.id }
+                                if (idx != -1) trainers[idx] = updated
+                                dayText = ""; timeText = ""; selectedMemberName = "Pilih Member"
+                                editingIndex = null
+                                onUpdateTrainer(updated)
+                                snackbarHostState.showSnackbar("Berhasil diperbarui!")
+                            } catch (e: Exception) { snackbarHostState.showSnackbar("Gagal: ${e.message}") }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text(if (editingIndex != null) "Update" else "Tambah", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Tutup", color = Color.Gray) } }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -750,7 +973,8 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
                         "specialization" to s,
                         "experience" to e,
                         "rate" to r,
-                        "description" to d
+                        "description" to d,
+                        "profileImageUrl" to ""
                     )
                     db.collection("trainers").document(newId).set(data)
                 } catch (ex: Exception) {}
@@ -777,7 +1001,8 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
                             "specialization" to updated.specialization,
                             "experience" to updated.experience,
                             "rate" to updated.rating,
-                            "description" to updated.description
+                            "description" to updated.description,
+                            "profileImageUrl" to updated.profileImageUrl
                         )
                         db.collection("trainers").document(updated.id).update(data)
                     } catch (e: Exception) {}
@@ -946,7 +1171,29 @@ fun TrainerListRow(trainers: SnapshotStateList<Trainer>, onTrainerClick: (Traine
             items(trainers) { trainer ->
                 Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = CardDark), modifier = Modifier.width(140.dp), onClick = { onTrainerClick(trainer) }) {
                     Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = AccentBlue.copy(alpha = 0.2f)) { Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue) }
+                        Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = AccentBlue.copy(alpha = 0.2f)) {
+                            if (trainer.profileImageUrl.startsWith("res:")) {
+                                val resourceName = trainer.profileImageUrl.removePrefix("res:")
+                                val painter = when {
+                                    resourceName.contains("chiko") -> painterResource(Res.drawable.pt_chiko)
+                                    resourceName.contains("gabriel") -> painterResource(Res.drawable.pt_gabriel)
+                                    resourceName.contains("marchel") -> painterResource(Res.drawable.pt_marchel)
+                                    else -> null
+                                }
+                                if (painter != null) {
+                                    Image(
+                                        painter = painter,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue)
+                                }
+                            } else {
+                                Icon(Icons.Default.Person, null, modifier = Modifier.padding(8.dp), tint = AccentBlue)
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(trainer.name, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, maxLines = 1)
                         Text("Trainer", fontSize = 10.sp, color = Color.Gray)

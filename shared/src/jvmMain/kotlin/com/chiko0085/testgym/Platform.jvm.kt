@@ -1,5 +1,6 @@
 package com.chiko0085.testgym
 
+import dev.gitlive.firebase.storage.Data
 import java.awt.Desktop
 import java.net.URI
 import java.net.URLEncoder
@@ -129,3 +130,7 @@ actual fun initFirebase() {
         }
     }
 }
+
+actual fun createStorageData(bytes: ByteArray): Data = TODO("Firebase Storage not supported on JVM yet")
+
+actual fun isStorageSupported(): Boolean = false

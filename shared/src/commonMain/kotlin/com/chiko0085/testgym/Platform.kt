@@ -1,5 +1,7 @@
 package com.chiko0085.testgym
 
+import dev.gitlive.firebase.storage.Data
+
 interface Platform {
     val name: String
 }
@@ -17,3 +19,7 @@ expect fun formatEpochToDate(millis: Long): String
 expect fun parseDateToMillis(dateStr: String): Long?
 
 expect fun initFirebase()
+
+expect fun createStorageData(bytes: ByteArray): Data
+
+expect fun isStorageSupported(): Boolean

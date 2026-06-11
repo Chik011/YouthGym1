@@ -1,5 +1,6 @@
 package com.chiko0085.testgym
 
+import dev.gitlive.firebase.storage.Data
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -76,3 +77,7 @@ actual fun parseDateToMillis(dateStr: String): Long? {
 actual fun initFirebase() {
     // Di Android sudah otomatis via google-services.json
 }
+
+actual fun createStorageData(bytes: ByteArray): Data = Data(bytes)
+
+actual fun isStorageSupported(): Boolean = true
