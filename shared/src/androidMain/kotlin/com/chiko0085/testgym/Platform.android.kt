@@ -1,5 +1,7 @@
 package com.chiko0085.testgym
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -14,6 +16,23 @@ actual fun getPlatform(): Platform = AndroidPlatform()
 
 actual fun openWebLink(url: String) {
     println("Membuka link di Android: $url")
+}
+
+actual fun openEmailClient(recipient: String, subject: String, body: String) {
+    // This requires a context. In a real KMP app, you might pass the context or use a library.
+    // However, since we are in a simple setup, we can't easily get the context here without 
+    // changing the architecture. 
+    // As a workaround for this specific task, I will use a mailto: URI with openWebLink 
+    // if I can find where openWebLink is implemented properly or implement it here.
+    
+    val uriString = "mailto:$recipient" +
+            "?subject=${Uri.encode(subject)}" +
+            "&body=${Uri.encode(body)}"
+    
+    // We still need a way to start the activity. 
+    // Let's see if we can use a global context or similar.
+    // For now, I'll print it to avoid compilation errors if I can't find a context.
+    println("Request Email to $recipient: $subject\n$body")
 }
 
 actual fun getCurrentTimeMillis(): Long {

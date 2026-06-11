@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,9 +32,7 @@ import com.chiko0085.testgym.db
 import dev.gitlive.firebase.firestore.*
 import com.chiko0085.testgym.formatEpochToDate
 import com.chiko0085.testgym.getCurrentTimeMillis
-import com.chiko0085.testgym.model.Admin
-import com.chiko0085.testgym.model.GymPackage
-import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.model.*
 import com.chiko0085.testgym.ui.theme.*
 import com.chiko0085.testgym.exportToExcel
 import kotlinx.coroutines.launch
@@ -51,6 +51,7 @@ val AccentBlue = Color(0xFF3B82F6)
 fun AdminDashboard(
     members: MutableList<Member>,
     gymPackages: SnapshotStateList<GymPackage>,
+    ptPackages: SnapshotStateList<PtPackage>, // Tambahan parameter baru
     trainers: SnapshotStateList<Trainer>,
     totalRevenue: Double,
     adminAccount: Admin,
@@ -66,6 +67,7 @@ fun AdminDashboard(
     var memberToEdit by remember { mutableStateOf<Member?>(null) }
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
     var memberToCheckIn by remember { mutableStateOf<Member?>(null) }
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
     var trainerForSchedule by remember { mutableStateOf<Trainer?>(null) }
     var showResetDialog by remember { mutableStateOf(false) }
     var snackbarHostState = remember { SnackbarHostState() }
@@ -86,6 +88,7 @@ fun AdminDashboard(
         "members" -> MemberManagementScreen(
             members = members,
             gymPackages = gymPackages,
+            ptPackages = ptPackages, // Tambahkan ini
             onCheckIn = { memberToCheckIn = it },
             onEdit = { memberToEdit = it },
             onDelete = { memberToDelete = it },
@@ -95,6 +98,7 @@ fun AdminDashboard(
             onBack = { currentScreen = "dashboard" }
         )
         "packages" -> PackageManagementScreen(gymPackages, onBack = { currentScreen = "dashboard" })
+        "pt_packages" -> PtPackageManagementScreen(ptPackages, onBack = { currentScreen = "dashboard" })
         "trainers" -> TrainerManagementScreen(trainers, onBack = { currentScreen = "dashboard" })
         "reservations" -> ReservationManagementScreen(onBack = { currentScreen = "dashboard" })
         "profile" -> AdminProfileScreen(adminAccount, onUpdateAdmin, onBack = { currentScreen = "dashboard" })
@@ -118,6 +122,9 @@ fun AdminDashboard(
                                 }
                                 TextButton(onClick = { currentScreen = "packages" }) {
                                     Text("Paket", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                TextButton(onClick = { currentScreen = "pt_packages" }) {
+                                    Text("Paket PT", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 TextButton(onClick = { currentScreen = "trainers" }) {
                                     Text("Trainer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -323,12 +330,28 @@ fun AdminDashboard(
         AddMemberDialog(
             packages = gymPackages,
             onDismiss = { showAddDialog = false },
-            onConfirm = { n, u, p, g, hp, d, pt, price, joinDate, pkgName ->
+            onConfirm = { n, u, p, e, g, hp, d, pt, price, joinDate, pkgName ->
                 scope.launch {
                     try {
                         val expirationTime = joinDate + (d * 86400000L)
                         val randomId = "CH-" + Random.nextInt(1000, 9999).toString()
-                        val newMember = Member(randomId, n, u, p, d, joinDate, expirationTime, 0.0, 0.0, g, hp, price, pkgName, pt)
+                        val newMember = Member(
+                            id = randomId,
+                            name = n,
+                            username = u,
+                            password = p,
+                            remainingDays = d,
+                            joinDate = joinDate,
+                            expiredDate = expirationTime,
+                            weight = 0.0,
+                            height = 0.0,
+                            gender = g,
+                            phoneNumber = hp,
+                            email = e,
+                            pricePaid = price,
+                            packageName = pkgName,
+                            remainingPtSessions = pt
+                        )
 
                         members.add(newMember)
                         onUpdateRevenue(totalRevenue + price)
@@ -339,6 +362,7 @@ fun AdminDashboard(
                             "name" to n,
                             "username" to u,
                             "password" to p,
+                            "email" to e,
                             "gender" to g,
                             "phoneNumber" to hp,
                             "remainingDays" to d,
@@ -351,7 +375,7 @@ fun AdminDashboard(
                             "packageName" to pkgName
                         )
                         db.collection("members").document(randomId).set(data)
-                    } catch (e: Exception) {}
+                    } catch (ex: Exception) {}
                 }
             }
         )
@@ -370,17 +394,19 @@ fun AdminDashboard(
                         memberToEdit = null
 
                         val data = mapOf(
-                            "id" to updated.id,
                             "name" to updated.name,
                             "username" to updated.username,
                             "password" to updated.password,
+                            "email" to updated.email,
+                            "phoneNumber" to updated.phoneNumber,
                             "remainingDays" to updated.remainingDays,
+                            "remainingPtSessions" to updated.remainingPtSessions,
                             "joinDate" to updated.joinDate,
                             "expiredDate" to updated.expiredDate,
                             "weight" to updated.weight,
                             "height" to updated.height
                         )
-                        db.collection("members").document(updated.id).set(data)
+                        db.collection("members").document(updated.id).update(data)
                     } catch (e: Exception) {}
                 }
             }
@@ -415,23 +441,26 @@ fun AdminDashboard(
         var timeText by remember { mutableStateOf("") }
         var selectedMemberName by remember { mutableStateOf("Pilih Member") }
         var memberDropdownExpanded by remember { mutableStateOf(false) }
+        var dayDropdownExpanded by remember { mutableStateOf(false) }
         var editingIndex by remember { mutableStateOf<Int?>(null) }
+
+        val availableDays = trainerForSchedule?.availability ?: listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 
         AlertDialog(
             onDismissRequest = { trainerForSchedule = null },
             title = { Text("Kelola Jadwal: Coach ${trainerForSchedule?.name}") },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Text("Daftar Jadwal:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Box(modifier = Modifier.heightIn(max = 200.dp)) {
+                    Box(modifier = Modifier.heightIn(max = 150.dp)) {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val currentSchedules = trainerForSchedule?.schedules ?: emptyList()
                             itemsIndexed(currentSchedules) { index, schedule ->
-                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(8.dp)) {
+                                Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)) {
                                     Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(schedule, fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                        Text(schedule, fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                                         Row {
                                             IconButton(onClick = {
                                                 try {
@@ -457,18 +486,6 @@ fun AdminDashboard(
                                                     if (idx != -1) trainers[idx] = updated
                                                     trainerForSchedule = updated
                                                 }
-                                            }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp)) }
-                                            IconButton(onClick = {
-                                                val trainer = trainerForSchedule!!
-                                                val newList = trainer.schedules.toMutableList()
-                                                newList.removeAt(index)
-                                                val updated = trainer.copy(schedules = newList)
-                                                scope.launch {
-                                                    db.collection("trainers").document(trainer.id).update(mapOf("schedules" to newList))
-                                                    val idx = trainers.indexOfFirst { it.id == trainer.id }
-                                                    if (idx != -1) trainers[idx] = updated
-                                                    trainerForSchedule = updated
-                                                }
                                             }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171), modifier = Modifier.size(16.dp)) }
                                         }
                                     }
@@ -481,8 +498,41 @@ fun AdminDashboard(
                     HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Form Jadwal:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AccentBlue)
-                    OutlinedTextField(value = dayText, onValueChange = { dayText = it }, label = { Text("Hari (Cth: Senin)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White))
+                    Text("Form Jadwal Baru:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AccentBlue)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Dropdown Hari yang menyesuaikan Availability PT
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = dayText, onValueChange = {}, label = { Text("Pilih Hari") }, readOnly = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = { IconButton(onClick = { dayDropdownExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } },
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
+                        )
+                        DropdownMenu(expanded = dayDropdownExpanded, onDismissRequest = { dayDropdownExpanded = false }) {
+                            listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu").forEach { day ->
+                                val isAvailable = availableDays.contains(day)
+                                DropdownMenuItem(
+                                    text = { 
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(day, color = if(isAvailable) Color.Black else Color.Gray)
+                                            if(!isAvailable) {
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("(PT Tidak Tersedia)", color = Color.Red, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }, 
+                                    onClick = { 
+                                        if(isAvailable) {
+                                            dayText = day
+                                            dayDropdownExpanded = false 
+                                        }
+                                    },
+                                    enabled = isAvailable
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(value = timeText, onValueChange = { timeText = it }, label = { Text("Jam (Cth: 10:00 WIB)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black, focusedContainerColor = Color.White, unfocusedContainerColor = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
@@ -535,6 +585,8 @@ fun AdminDashboard(
 @Composable
 fun PackageManagementScreen(packages: SnapshotStateList<GymPackage>, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
     var packageToEdit by remember { mutableStateOf<GymPackage?>(null) }
     var showAddPackage by remember { mutableStateOf(false) }
 
@@ -626,6 +678,8 @@ fun PackageDialog(title: String, initialPackage: GymPackage? = null, onDismiss: 
 @Composable
 fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
     var showAddTrainer by remember { mutableStateOf(false) }
     var trainerToEdit by remember { mutableStateOf<Trainer?>(null) }
 
@@ -716,7 +770,6 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
                         trainerToEdit = null
 
                         val data = mapOf(
-                            "id" to updated.id,
                             "name" to updated.name,
                             "username" to updated.username,
                             "password" to updated.password,
@@ -726,7 +779,7 @@ fun TrainerManagementScreen(trainers: SnapshotStateList<Trainer>, onBack: () -> 
                             "rate" to updated.rating,
                             "description" to updated.description
                         )
-                        db.collection("trainers").document(updated.id).set(data)
+                        db.collection("trainers").document(updated.id).update(data)
                     } catch (e: Exception) {}
                 }
             }
@@ -828,6 +881,8 @@ fun AdminProfileScreen(admin: Admin, onUpdate: (Admin) -> Unit, onBack: () -> Un
     var username by remember { mutableStateOf(admin.username) }
     var password by remember { mutableStateOf(admin.password) }
     val scope = rememberCoroutineScope()
+
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
@@ -907,11 +962,12 @@ fun TrainerListRow(trainers: SnapshotStateList<Trainer>, onTrainerClick: (Traine
 fun AddMemberDialog(
     packages: List<GymPackage>,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String, String, Int, Int, Double, Long, String) -> Unit
+    onConfirm: (String, String, String, String, String, String, Int, Int, Double, Long, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("Laki-laki") }
     var phone by remember { mutableStateOf("") }
     var ptSessions by remember { mutableStateOf("0") }
@@ -928,6 +984,7 @@ fun AddMemberDialog(
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Nomor HP") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = ptSessions, onValueChange = { ptSessions = it }, label = { Text("Sesi PT") }, modifier = Modifier.fillMaxWidth())
 
@@ -969,10 +1026,13 @@ fun AddMemberDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    selectedPackage?.let { pkg ->
-                        onConfirm(name, username, password, gender, phone, pkg.durationDays, ptSessions.toIntOrNull() ?: 0, pkg.price ?: 0.0, joinDate, pkg.name)
+                    if (name.isNotBlank() && username.isNotBlank() && password.isNotBlank() && email.isNotBlank() && phone.isNotBlank() && selectedPackage != null) {
+                        selectedPackage?.let { pkg ->
+                            onConfirm(name, username, password, email, gender, phone, pkg.durationDays, ptSessions.toIntOrNull() ?: 0, pkg.price ?: 0.0, joinDate, pkg.name)
+                        }
                     }
                 },
+                enabled = name.isNotBlank() && username.isNotBlank() && password.isNotBlank() && email.isNotBlank() && phone.isNotBlank() && selectedPackage != null,
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) { Text("Simpan", color = Color.White) }
         },
@@ -990,6 +1050,8 @@ fun EditMemberDialog(
     var name by remember { mutableStateOf(member.name) }
     var username by remember { mutableStateOf(member.username) }
     var password by remember { mutableStateOf(member.password) }
+    var email by remember { mutableStateOf(member.email) }
+    var phone by remember { mutableStateOf(member.phoneNumber) }
     var remainingDays by remember { mutableStateOf(member.remainingDays.toString()) }
     var ptSessions by remember { mutableStateOf(member.remainingPtSessions.toString()) }
 
@@ -1001,6 +1063,8 @@ fun EditMemberDialog(
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Nomor HP") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = remainingDays, onValueChange = { remainingDays = it }, label = { Text("Sisa Hari") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = ptSessions, onValueChange = { ptSessions = it }, label = { Text("Sesi PT") }, modifier = Modifier.fillMaxWidth())
             }
@@ -1012,6 +1076,8 @@ fun EditMemberDialog(
                         name = name,
                         username = username,
                         password = password,
+                        email = email,
+                        phoneNumber = phone,
                         remainingDays = remainingDays.toIntOrNull() ?: member.remainingDays,
                         remainingPtSessions = ptSessions.toIntOrNull() ?: member.remainingPtSessions
                     )
@@ -1030,7 +1096,8 @@ fun MemberCard(
     onCheckIn: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onExtend: () -> Unit
+    onExtend: () -> Unit,
+    onBuyPt: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1060,15 +1127,27 @@ fun MemberCard(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onExtend,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Perpanjang Paket", color = Color.White, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onExtend,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Perpanjang Paket", color = Color.White, fontSize = 11.sp)
+                }
+                Button(
+                    onClick = onBuyPt,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sewa PT", color = Color.White, fontSize = 11.sp)
+                }
             }
         }
     }
@@ -1177,6 +1256,8 @@ fun parseDateToMillis(dateStr: String): Long? {
 @Composable
 fun ReservationManagementScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
     var selectedDateMillis by remember { mutableStateOf(getCurrentTimeMillis()) }
     var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -1265,6 +1346,7 @@ fun ReservationSlotCard(reservation: Reservation, onToggleStatus: (String) -> Un
 fun MemberManagementScreen(
     members: List<Member>,
     gymPackages: List<GymPackage>,
+    ptPackages: List<PtPackage>, // Tambahkan ini
     onCheckIn: (Member) -> Unit,
     onEdit: (Member) -> Unit,
     onDelete: (Member) -> Unit,
@@ -1274,20 +1356,35 @@ fun MemberManagementScreen(
     onBack: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("Semua") } // Opsi: Semua, Aktif, Tidak Aktif
+    val filterOptions = listOf("Semua", "Aktif", "Tidak Aktif")
+    val pagerState = rememberPagerState(pageCount = { filterOptions.size })
+    var sortOrder by remember { mutableStateOf("Terbaru") } // Opsi: Terbaru, Terlama, A-Z, Z-A
+    var sortExpanded by remember { mutableStateOf(false) }
     var memberToExtend by remember { mutableStateOf<Member?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Menggabungkan logika search bar dan filter tab aktif / tidak aktif
-    val finalFilteredList = members.filter { member ->
-        val matchesSearch = member.name.contains(searchQuery, ignoreCase = true) || member.id.contains(searchQuery)
-        val isActive = member.remainingDays > 0
-        val matchesFilter = when (selectedFilter) {
-            "Aktif" -> isActive
-            "Tidak Aktif" -> !isActive
-            else -> true
+    var memberToBuyPtPackage by remember { mutableStateOf<Member?>(null) }
+
+    // Fungsi pembantu untuk memproses list berdasarkan filter dan sort
+    fun getFilteredAndSortedList(filter: String): List<Member> {
+        return members.filter { member ->
+            val matchesSearch = member.name.contains(searchQuery, ignoreCase = true) || member.id.contains(searchQuery)
+            val isActive = member.remainingDays > 0
+            val matchesFilter = when (filter) {
+                "Aktif" -> isActive
+                "Tidak Aktif" -> !isActive
+                else -> true
+            }
+            matchesSearch && matchesFilter
+        }.let { list ->
+            when (sortOrder) {
+                "A-Z" -> list.sortedBy { it.name }
+                "Z-A" -> list.sortedByDescending { it.name }
+                "Terbaru" -> list.sortedByDescending { it.joinDate }
+                "Terlama" -> list.sortedBy { it.joinDate }
+                else -> list
+            }
         }
-        matchesSearch && matchesFilter
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
@@ -1334,43 +1431,99 @@ fun MemberManagementScreen(
                 // Baris Filter Tab Segmented (Semua, Aktif, Tidak Aktif)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf("Semua", "Aktif", "Tidak Aktif").forEach { filterOption ->
-                        val isSelected = selectedFilter == filterOption
+                    filterOptions.forEachIndexed { index, filterOption ->
+                        val isSelected = pagerState.currentPage == index
                         Button(
-                            onClick = { selectedFilter = filterOption },
+                            onClick = { 
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isSelected) AccentBlue else CardDark,
                                 contentColor = if (isSelected) Color.White else Color.LightGray
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.height(36.dp)
                         ) {
-                            Text(filterOption, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(filterOption, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Baris Urutan (Dropdown Menu)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Sort, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    Text("Urutkan:", color = Color.Gray, fontSize = 11.sp)
+                    
+                    Box {
+                        TextButton(
+                            onClick = { sortExpanded = true },
+                            colors = ButtonDefaults.textButtonColors(contentColor = AccentBlue),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text(sortOrder, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+                        }
+                        
+                        DropdownMenu(
+                            expanded = sortExpanded,
+                            onDismissRequest = { sortExpanded = false }
+                        ) {
+                            val options = listOf("Terbaru", "Terlama", "A-Z", "Z-A")
+                            options.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        sortOrder = option
+                                        sortExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // List Tampilan Member Berdasarkan Hasil Filter
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-                    if (finalFilteredList.isEmpty()) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text("Tidak ada data member found.", color = Color.Gray, fontSize = 14.sp)
+                // List Tampilan Member Berdasarkan Hasil Filter dengan Drag/Swipe Support
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top
+                ) { pageIndex ->
+                    val currentFilter = filterOptions[pageIndex]
+                    val currentList = getFilteredAndSortedList(currentFilter)
+                    
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (currentList.isEmpty()) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text("Tidak ada data member found.", color = Color.Gray, fontSize = 14.sp)
+                                }
                             }
-                        }
-                    } else {
-                        items(finalFilteredList) { member ->
-                            MemberCard(
-                                member = member,
-                                onCheckIn = { onCheckIn(member) },
-                                onEdit = { onEdit(member) },
-                                onDelete = { onDelete(member) },
-                                onExtend = { memberToExtend = member }
-                            )
+                        } else {
+                            items(currentList) { member ->
+                                MemberCard(
+                                    member = member,
+                                    onCheckIn = { onCheckIn(member) },
+                                    onEdit = { onEdit(member) },
+                                    onDelete = { onDelete(member) },
+                                    onExtend = { memberToExtend = member },
+                                    onBuyPt = { memberToBuyPtPackage = member }
+                                )
+                            }
                         }
                     }
                 }
@@ -1412,6 +1565,43 @@ fun MemberManagementScreen(
                         
                         onUpdateRevenue(totalRevenue + (pkg.price ?: 0.0))
                         memberToExtend = null
+                    } catch (e: Exception) {}
+                }
+            }
+        )
+    }
+
+    if (memberToBuyPtPackage != null) {
+        BuyPtPackageDialog(
+            member = memberToBuyPtPackage!!,
+            packages = ptPackages,
+            onDismiss = { memberToBuyPtPackage = null },
+            onConfirm = { pkg ->
+                scope.launch {
+                    try {
+                        val m = memberToBuyPtPackage!!
+                        val updatedPtSessions = m.remainingPtSessions + pkg.sessions
+                        val updatedPricePaid = (m.pricePaid ?: 0.0) + pkg.price!!
+                        
+                        val updated = m.copy(
+                            remainingPtSessions = updatedPtSessions,
+                            pricePaid = updatedPricePaid
+                        )
+                        
+                        db.collection("members").document(m.id).update(mapOf(
+                            "remainingPtSessions" to updatedPtSessions,
+                            "pricePaid" to updatedPricePaid
+                        ))
+                        
+                        val idx = members.indexOfFirst { it.id == m.id }
+                        if (idx != -1) {
+                            if (members is MutableList) {
+                                (members as MutableList<Member>)[idx] = updated
+                            }
+                        }
+                        
+                        onUpdateRevenue(totalRevenue + (pkg.price ?: 0.0))
+                        memberToBuyPtPackage = null
                     } catch (e: Exception) {}
                 }
             }
@@ -1464,6 +1654,148 @@ fun ExtendMembershipDialog(
                 onClick = { selectedPackage?.let { onConfirm(it) } },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) { Text("Perpanjang", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PtPackageManagementScreen(packages: SnapshotStateList<PtPackage>, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var packageToEdit by remember { mutableStateOf<PtPackage?>(null) }
+    var showAddPackage by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = { TopAppBar(title = { Text("Manajemen Paket PT", color = Color.White) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent), navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }) },
+            floatingActionButton = { FloatingActionButton(onClick = { showAddPackage = true }, containerColor = AccentBlue) { Icon(Icons.Default.Add, null, tint = Color.White) } }
+        ) { padding ->
+            LazyColumn(modifier = Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(packages) { pkg ->
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark)) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(pkg.name, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+                                Text("Harga: Rp ${formatRupiah(pkg.price ?: 0.0)}", color = AccentBlue, fontWeight = FontWeight.Bold)
+                                Text("Sesi: ${pkg.sessions} Sesi", fontSize = 14.sp, color = Color.LightGray)
+                            }
+                            IconButton(onClick = { packageToEdit = pkg }) { Icon(Icons.Default.Edit, null, tint = Color.LightGray) }
+                            IconButton(onClick = {
+                                scope.launch {
+                                    try {
+                                        val idToRemove = pkg.id
+                                        packages.remove(pkg)
+                                        db.collection("pt_packages").document(idToRemove).delete()
+                                    } catch (e: Exception) {}
+                                }
+                            }) { Icon(Icons.Default.Delete, null, tint = Color(0xFFF87171)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddPackage) {
+        PtPackageDialog(title = "Tambah Paket PT", onDismiss = { showAddPackage = false }, onConfirm = { n, p, s ->
+            scope.launch {
+                try {
+                    val randomId = "PT-PKG-" + Random.nextInt(1000, 9999).toString()
+                    val newPkg = PtPackage(randomId, n, p, s)
+                    packages.add(newPkg)
+                    showAddPackage = false
+                    db.collection("pt_packages").document(randomId).set(mapOf("id" to randomId, "name" to n, "price" to p, "sessions" to s))
+                } catch (e: Exception) {}
+            }
+        })
+    }
+
+    if (packageToEdit != null) {
+        PtPackageDialog(title = "Edit Paket PT", initialPackage = packageToEdit, onDismiss = { packageToEdit = null }, onConfirm = { n, p, s ->
+            scope.launch {
+                try {
+                    val updatedPkg = packageToEdit!!.copy(name = n, price = p, sessions = s)
+                    val idx = packages.indexOfFirst { it.id == updatedPkg.id }
+                    if (idx != -1) packages[idx] = updatedPkg
+                    packageToEdit = null
+                    db.collection("pt_packages").document(updatedPkg.id).update(mapOf("name" to n, "price" to p, "sessions" to s))
+                } catch (e: Exception) {}
+            }
+        })
+    }
+}
+
+@Composable
+fun PtPackageDialog(title: String, initialPackage: PtPackage? = null, onDismiss: () -> Unit, onConfirm: (String, Double, Int) -> Unit) {
+    var name by remember { mutableStateOf(initialPackage?.name ?: "") }
+    var price by remember { mutableStateOf(initialPackage?.price?.toLong()?.toString() ?: "") }
+    var sessions by remember { mutableStateOf(initialPackage?.sessions?.toString() ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Paket PT") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga (Angka saja)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = sessions, onValueChange = { sessions = it }, label = { Text("Jumlah Sesi") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name, price.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0, sessions.filter { it.isDigit() }.toIntOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) { Text("Simpan", color = Color.White) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BuyPtPackageDialog(
+    member: Member,
+    packages: List<PtPackage>,
+    onDismiss: () -> Unit,
+    onConfirm: (PtPackage) -> Unit
+) {
+    var selectedPackage by remember { mutableStateOf<PtPackage?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sewa Paket PT: ${member.name}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Pilih paket Personal Trainer untuk menambahkan sesi latihan member.", fontSize = 14.sp)
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedPackage?.name ?: "Pilih Paket PT",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Paket PT") },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = { IconButton(onClick = { expanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } }
+                    )
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        packages.forEach { pkg ->
+                            DropdownMenuItem(
+                                text = { Text("${pkg.name} - ${pkg.sessions} Sesi (Rp ${formatRupiah(pkg.price ?: 0.0)})") },
+                                onClick = {
+                                    selectedPackage = pkg
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { selectedPackage?.let { onConfirm(it) } },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                enabled = selectedPackage != null
+            ) { Text("Beli Paket", color = Color.White) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) } }
     )

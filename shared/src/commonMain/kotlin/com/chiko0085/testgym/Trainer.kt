@@ -10,11 +10,10 @@ data class Trainer(
     val username: String = "",
     val password: String = "",
     val gender: String = "Laki-laki",
-    val specialization: String = "",
-    val experience: String = "0",
+    val specialization: String,
+    val experience: String,
     @SerialName("rate")
     val rating: Double? = 0.0,
-    val description: String = "",
-    val profileImageUrl: String = "",
+    val description: String,
     val schedules: List<String> = emptyList()
 )

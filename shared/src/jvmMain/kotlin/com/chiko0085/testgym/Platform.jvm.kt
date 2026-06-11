@@ -1,5 +1,8 @@
 package com.chiko0085.testgym
 
+import java.awt.Desktop
+import java.net.URI
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,6 +26,26 @@ actual fun openWebLink(url: String) {
     if (os.contains("win")) rt.exec("rundll32 url.dll,FileProtocolHandler $url")
     else if (os.contains("mac")) rt.exec("open $url")
     else rt.exec("xdg-open $url")
+}
+
+actual fun openEmailClient(recipient: String, subject: String, body: String) {
+    try {
+        val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
+        if (desktop != null && desktop.isSupported(Desktop.Action.MAIL)) {
+            val mailto = "mailto:$recipient" +
+                    "?subject=${URLEncoder.encode(subject, "UTF-8").replace("+", "%20")}" +
+                    "&body=${URLEncoder.encode(body, "UTF-8").replace("+", "%20")}"
+            desktop.mail(URI(mailto))
+        } else {
+            // Fallback to openWebLink if Desktop.mail is not supported
+            val mailto = "mailto:$recipient" +
+                    "?subject=${URLEncoder.encode(subject, "UTF-8").replace("+", "%20")}" +
+                    "&body=${URLEncoder.encode(body, "UTF-8").replace("+", "%20")}"
+            openWebLink(mailto)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
 
 actual fun getCurrentTimeMillis(): Long {

@@ -8,6 +8,8 @@ expect fun getPlatform(): Platform
 
 expect fun openWebLink(url: String)
 
+expect fun openEmailClient(recipient: String, subject: String, body: String)
+
 expect fun getCurrentTimeMillis(): Long
 
 expect fun formatEpochToDate(millis: Long): String
