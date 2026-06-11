@@ -1204,114 +1204,247 @@ fun MemberProfileScreen(member: Member, onLogout: () -> Unit) {
     // CoroutineScope untuk operasi async (update Firebase)
     val scope = rememberCoroutineScope()
 
-    // State form yang bisa diedit oleh pengguna
+    // State form Data Diri
     var name by remember { mutableStateOf(member.name) }
     var weight by remember { mutableStateOf(if ((member.weight ?: 0.0) > 0) (member.weight?.toString() ?: "") else "") }
     var height by remember { mutableStateOf(if ((member.height ?: 0.0) > 0) (member.height?.toString() ?: "") else "") }
 
-    // --- KALKULASI SISA MASA AKTIF (sama seperti di HomeScreen) ---
+    // State form Keamanan Akun
+    var username by remember { mutableStateOf(member.username) }
+    var password by remember { mutableStateOf(member.password) }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    // State untuk UI Feedback (Loading, Snackbar, & Dialog Konfirmasi)
+    var isSaving by remember { mutableStateOf(false) }
+    var showSecurityDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // --- KALKULASI SISA MASA AKTIF ---
     val currentTime = com.chiko0085.testgym.getCurrentTimeMillis()
     val calendarDaysLeft = if (member.expiredDate <= 0L) member.remainingDays
     else ((member.expiredDate - currentTime) / 86400000L).toInt()
     val isActive = member.remainingDays > 0 && calendarDaysLeft > 0
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Profil Saya", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Spacer(modifier = Modifier.height(24.dp))
+    // --- FUNGSI HELPER UNTUK MENYIMPAN DATA ---
+    // Dipisahkan agar bisa dipanggil langsung atau melalui dialog konfirmasi
+    val performSave = {
+        isSaving = true
+        val updatedWeight = weight.toDoubleOrNull() ?: 0.0
+        val updatedHeight = height.toDoubleOrNull() ?: 0.0
 
-        // --- AVATAR LINGKARAN ---
-        Surface(modifier = Modifier.size(80.dp), shape = CircleShape, color = AccentBlue.copy(alpha = 0.2f)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, null, modifier = Modifier.size(50.dp), tint = AccentBlue)
+        val updatedMember = member.copy(
+            name = name,
+            weight = updatedWeight,
+            height = updatedHeight,
+            username = username,
+            password = password
+        )
+
+        scope.launch {
+            try {
+                db.collection("members").document(member.id).set(updatedMember)
+                // Perbarui data lokal
+                member.name = name
+                member.weight = updatedWeight
+                member.height = updatedHeight
+                member.username = username
+                member.password = password
+
+                snackbarHostState.showSnackbar("Data berhasil disimpan!")
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar("Gagal menyimpan perubahan. Coba lagi.")
+            } finally {
+                isSaving = false
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+    }
 
-        // --- BADGE STATUS AKTIF / EXPIRED ---
-        Surface(
-            color = if (isActive) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFEF4444).copy(alpha = 0.15f),
-            shape = RoundedCornerShape(8.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = if (isActive) "Status: AKTIF (Sisa $calendarDaysLeft Hari)" else "Status: EXPIRED",
-                color = if (isActive) Color(0xFF34D399) else Color(0xFFF87171),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            Text("Profil Saya", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- AVATAR LINGKARAN ---
+            Surface(modifier = Modifier.size(80.dp), shape = CircleShape, color = AccentBlue.copy(alpha = 0.2f)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Person, null, modifier = Modifier.size(50.dp), tint = AccentBlue)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- BADGE STATUS AKTIF / EXPIRED ---
+            Surface(
+                color = if (isActive) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFEF4444).copy(alpha = 0.15f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = if (isActive) "Status: AKTIF (Sisa $calendarDaysLeft Hari)" else "Status: EXPIRED",
+                    color = if (isActive) Color(0xFF34D399) else Color(0xFFF87171),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            val tfColors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                focusedBorderColor = AccentBlue, unfocusedBorderColor = TextSub.copy(alpha = 0.5f),
+                focusedLabelColor = AccentBlue, unfocusedLabelColor = TextSub
             )
+
+            // --- FORM EDIT PROFIL (DATA FISIK) ---
+            OutlinedTextField(
+                value = name, onValueChange = { name = it },
+                label = { Text("Nama Lengkap") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = weight, onValueChange = { weight = it },
+                    label = { Text("Berat (kg)") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
+                )
+                OutlinedTextField(
+                    value = height, onValueChange = { height = it },
+                    label = { Text("Tinggi (cm)") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- FORM EDIT KEAMANAN AKUN ---
+            Text("Keamanan Akun", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.align(Alignment.Start))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = username, onValueChange = { username = it },
+                label = { Text("Username Login") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = password, onValueChange = { password = it },
+                label = { Text("Password Baru") },
+                visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                trailingIcon = {
+                    val image = if (passwordVisible) Icons.Filled.CheckCircle else Icons.Filled.Lock
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(image, "Toggle Password Visibility", tint = TextSub)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = tfColors, singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- TOMBOL SIMPAN PERUBAHAN ---
+            Button(
+                onClick = {
+                    if (isSaving) return@Button
+
+                    // Cek apakah ada perubahan di Username atau Password
+                    val isAccountChanged = username != member.username || password != member.password
+
+                    if (isAccountChanged) {
+                        // Jika ada perubahan kredensial, tampilkan dialog konfirmasi
+                        showSecurityDialog = true
+                    } else {
+                        // Jika hanya ganti nama/berat/tinggi, langsung simpan
+                        performSave()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                enabled = !isSaving
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Simpan Perubahan", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- TOMBOL LOGOUT ---
+            TextButton(onClick = onLogout) {
+                Text("Logout / Keluar", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(80.dp))
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- KONFIGURASI WARNA FIELD TEKS TEMA GELAP ---
-        val tfColors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-            focusedBorderColor = AccentBlue, unfocusedBorderColor = TextSub.copy(alpha = 0.5f),
-            focusedLabelColor = AccentBlue, unfocusedLabelColor = TextSub
-        )
-
-        // --- FORM EDIT PROFIL ---
-        // Field nama lengkap
-        OutlinedTextField(
-            value = name, onValueChange = { name = it },
-            label = { Text("Nama Lengkap") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp), colors = tfColors
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Field berat & tinggi berdampingan dalam satu baris
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = weight, onValueChange = { weight = it },
-                label = { Text("Berat (kg)") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp), colors = tfColors
-            )
-            OutlinedTextField(
-                value = height, onValueChange = { height = it },
-                label = { Text("Tinggi (cm)") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp), colors = tfColors
-            )
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- TOMBOL SIMPAN PERUBAHAN ---
-        Button(
-            onClick = {
-                val updatedWeight = weight.toDoubleOrNull() ?: 0.0
-                val updatedHeight = height.toDoubleOrNull() ?: 0.0
-                // Buat salinan baru objek member dengan data yang sudah diperbarui
-                val updatedMember = member.copy(name = name, weight = updatedWeight, height = updatedHeight)
-                // Update ke Firebase secara asinkron
-                scope.launch {
-                    try {
-                        db.collection("members").document(member.id).set(updatedMember)
-                        // Perbarui juga data lokal (in-memory) agar tampilan langsung berubah
-                        member.name = name
-                        member.weight = updatedWeight
-                        member.height = updatedHeight
-                    } catch (_: Exception) {
-                        // TODO: Tampilkan Snackbar error jika update gagal
+        // --- DIALOG KONFIRMASI KEAMANAN (VERIFIKASI) ---
+        if (showSecurityDialog) {
+            AlertDialog(
+                onDismissRequest = { showSecurityDialog = false },
+                containerColor = Color(0xFF112240),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Warning, contentDescription = "Warning", tint = Color(0xFFFBBF24))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Verifikasi Keamanan", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Text(
+                        "Anda mendeteksi perubahan pada Username atau Password.\n\nPastikan data yang dimasukkan sudah benar karena ini akan digunakan untuk login Anda selanjutnya. Apakah Anda yakin ingin menyimpannya?",
+                        color = Color.LightGray,
+                        lineHeight = 20.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showSecurityDialog = false
+                            performSave() // Jalankan fungsi simpan jika disetujui
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF87171)), // Warna tombol merah agar user lebih waspada
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Ya, Saya Yakin", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSecurityDialog = false }) {
+                        Text("Batal", color = Color.Gray)
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-        ) {
-            Text("Simpan Perubahan", fontWeight = FontWeight.Bold, color = Color.White)
+            )
         }
 
-        // Spacer fleksibel mendorong tombol logout ke bawah layar
-        Spacer(modifier = Modifier.weight(1f))
-
-        // --- TOMBOL LOGOUT ---
-        TextButton(onClick = onLogout) {
-            Text("Logout / Keluar", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+        // --- SNACKBAR HOST UNTUK MENAMPILKAN PESAN ---
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = Color(0xFF1E293B),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(12.dp)
+            )
         }
     }
 }

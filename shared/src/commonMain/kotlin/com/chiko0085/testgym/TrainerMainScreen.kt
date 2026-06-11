@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +46,7 @@ fun TrainerMainScreen(
 
     var displayTrainer by remember(trainer) { mutableStateOf(trainer) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showAccountDialog by remember { mutableStateOf(false) } // State baru untuk dialog akun
     var isUploading by remember { mutableStateOf(false) }
 
     LaunchedEffect(trainer.profileImageUrl) {
@@ -54,7 +57,6 @@ fun TrainerMainScreen(
         listOf("Belum ada jadwal melatih yang ditugaskan oleh admin.")
     }
 
-    // Memanggil fungsi jembatan multiplatform kita
     val launchImagePicker = rememberImagePicker(
         onResult = { imageBytes ->
             isUploading = true
@@ -104,7 +106,6 @@ fun TrainerMainScreen(
                                         .border(2.dp, Color(0xFF3B82F6), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    // LOGIKA TAMPILAN FOTO & LOADING
                                     if (isUploading) {
                                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
                                     } else if (displayTrainer.profileImageUrl.isNotEmpty()) {
@@ -121,7 +122,6 @@ fun TrainerMainScreen(
 
                                 Surface(
                                     modifier = Modifier.size(28.dp).offset(x = 4.dp, y = 4.dp).clickable {
-                                        // PERBAIKAN DI SINI: Panggil fungsi launchImagePicker()
                                         launchImagePicker()
                                     },
                                     shape = CircleShape,
@@ -141,8 +141,14 @@ fun TrainerMainScreen(
                                 Text(displayTrainer.description.ifEmpty { "Belum ada bio/portofolio yang ditulis." }, color = Color.LightGray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
                             }
 
-                            IconButton(onClick = { showEditDialog = true }, modifier = Modifier.background(Color.White.copy(alpha = 0.1f), CircleShape)) {
-                                Icon(Icons.Default.Settings, contentDescription = "Edit Profile", tint = Color.White)
+                            // TOMBOL PENGATURAN PROFIL & AKUN
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                IconButton(onClick = { showEditDialog = true }, modifier = Modifier.background(Color.White.copy(alpha = 0.1f), CircleShape).size(36.dp)) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Edit Profile", tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                IconButton(onClick = { showAccountDialog = true }, modifier = Modifier.background(Color.White.copy(alpha = 0.1f), CircleShape).size(36.dp)) {
+                                    Icon(Icons.Default.Lock, contentDescription = "Edit Akun", tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
                             }
                         }
 
@@ -150,8 +156,7 @@ fun TrainerMainScreen(
                         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TrainerStatItem(icon = Icons.Default.Star, title = "Rating", value = "${displayTrainer.rating ?: 0.0}/5.0", color = Color(0xFFFBBF24))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                             TrainerStatItem(icon = Icons.Default.CheckCircle, title = "Spesialisasi", value = displayTrainer.specialization.ifEmpty { "-" }, color = Color(0xFF10B981))
                             TrainerStatItem(icon = Icons.Default.Face, title = "Pengalaman", value = "${displayTrainer.experience} Thn", color = Color(0xFF8B5CF6))
                         }
@@ -187,6 +192,7 @@ fun TrainerMainScreen(
             }
         }
 
+        // Dialog Edit Profil
         if (showEditDialog) {
             EditProfileDialog(
                 currentTrainer = displayTrainer,
@@ -195,6 +201,19 @@ fun TrainerMainScreen(
                     onSaveProfile(updatedTrainer)
                     displayTrainer = updatedTrainer
                     showEditDialog = false
+                }
+            )
+        }
+
+        // Dialog Edit Akun (Username & Password)
+        if (showAccountDialog) {
+            AccountSettingsDialog(
+                currentTrainer = displayTrainer,
+                onDismiss = { showAccountDialog = false },
+                onSave = { updatedTrainer ->
+                    onSaveProfile(updatedTrainer)
+                    displayTrainer = updatedTrainer
+                    showAccountDialog = false
                 }
             )
         }
@@ -211,6 +230,7 @@ fun TrainerStatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title
     }
 }
 
+// Dialog existing untuk Profil
 @Composable
 fun EditProfileDialog(
     currentTrainer: Trainer,
@@ -283,6 +303,82 @@ fun EditProfileDialog(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Simpan Data", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal", color = Color.Gray)
+            }
+        }
+    )
+}
+
+// Dialog BARU untuk Username & Password
+@Composable
+fun AccountSettingsDialog(
+    currentTrainer: Trainer,
+    onDismiss: () -> Unit,
+    onSave: (Trainer) -> Unit
+) {
+    // Asumsi class Trainer punya field username dan password. Jika beda nama, silakan disesuaikan.
+    var username by remember { mutableStateOf(currentTrainer.username) }
+    var password by remember { mutableStateOf(currentTrainer.password) }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF112240),
+        title = { Text("Keamanan Akun", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username Login") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        focusedLabelColor = Color(0xFF3B82F6)
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password Baru") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (passwordVisible) Icons.Filled.CheckCircle else Icons.Filled.Lock // Bisa diganti icon visibility jika ada
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(image, "Toggle Password Visibility", tint = Color.LightGray)
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF3B82F6),
+                        focusedLabelColor = Color(0xFF3B82F6)
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val updated = currentTrainer.copy(
+                        username = username,
+                        password = password
+                    )
+                    onSave(updated)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), // Warna merah sedikit biar terkesan kredensial sensitif
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Simpan Akun", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
