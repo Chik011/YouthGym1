@@ -59,22 +59,22 @@ kotlin {
         // ---------------------------------------------
 
         commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(compose.materialIconsExtended)
+            api(libs.compose.runtime)
+            api(libs.compose.foundation)
+            api(libs.compose.material3)
+            api(libs.compose.ui)
+            api(libs.compose.components.resources)
+            api(libs.compose.uiToolingPreview)
+            api(libs.androidx.lifecycle.viewmodelCompose)
+            api(libs.androidx.lifecycle.runtimeCompose)
+            api(compose.materialIconsExtended)
             implementation("com.russhwolf:multiplatform-settings:1.1.1")
             implementation("com.russhwolf:multiplatform-settings-no-arg:1.1.1")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
             // Kamel dan Firebase Storage tetap di commonMain
             implementation("media.kamel:kamel-image:0.9.5")
-            implementation("dev.gitlive:firebase-storage:1.10.4")
+            api(libs.firebase.storage)
 
             api(libs.firebase.firestore)
             api(libs.firebase.common)

@@ -15,5 +15,7 @@ data class Trainer(
     @SerialName("rate")
     val rating: Double? = 0.0,
     val description: String,
-    val schedules: List<String> = emptyList()
+    val availability: List<String> = listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"),
+    val schedules: List<String> = emptyList(),
+    val profileImageUrl: String = ""
 )

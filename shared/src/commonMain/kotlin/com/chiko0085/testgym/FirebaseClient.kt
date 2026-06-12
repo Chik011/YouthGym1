@@ -2,6 +2,7 @@ package com.chiko0085.testgym
 
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.firestore.firestore
+import dev.gitlive.firebase.storage.storage
 
 val db by lazy { 
     // Pastikan inisialisasi dipanggil sebelum akses firestore
@@ -12,3 +13,5 @@ val db by lazy {
     }
     Firebase.firestore 
 }
+
+val storage by lazy { Firebase.storage }

@@ -1,5 +1,6 @@
 package com.chiko0085.testgym
 
+import dev.gitlive.firebase.storage.Data
 import java.awt.Desktop
 import java.net.URI
 import java.net.URLEncoder
@@ -87,45 +88,55 @@ actual fun parseDateToMillis(dateStr: String): Long? {
 }
 
 // Global variable untuk menyimpan status inisialisasi agar tidak dipanggil berulang
+@Volatile
 private var isFirebaseInitialized = false
+private val initLock = Any()
 
 actual fun initFirebase() {
     if (isFirebaseInitialized) return
     
-    try {
-        // Initialize Firebase Platform for JVM/Desktop
-        FirebasePlatform.initializeFirebasePlatform(object : FirebasePlatform() {
-            private val prefs = java.util.prefs.Preferences.userRoot().node("com.chiko0085.testgym")
-            override fun store(key: String, value: String) {
-                prefs.put(key, value)
-            }
-            override fun retrieve(key: String): String? = prefs.get(key, null)
-            override fun clear(key: String) {
-                prefs.remove(key)
-            }
-            override fun log(msg: String) = println("FIREBASE: $msg")
-        })
+    synchronized(initLock) {
+        if (isFirebaseInitialized) return
+        
+        try {
+            // Initialize Firebase Platform for JVM/Desktop
+            FirebasePlatform.initializeFirebasePlatform(object : FirebasePlatform() {
+                private val prefs = java.util.prefs.Preferences.userRoot().node("com.chiko0085.testgym")
+                override fun store(key: String, value: String) {
+                    prefs.put(key, value)
+                }
+                override fun retrieve(key: String): String? = prefs.get(key, null)
+                override fun clear(key: String) {
+                    prefs.remove(key)
+                }
+                override fun log(msg: String) = println("FIREBASE: $msg")
+            })
 
-        val options = FirebaseOptions(
-            applicationId = "1:713442868886:android:40c655c252db2fda9bccb7",
-            apiKey = "AIzaSyCvGwpy_N4ZgEPfiPaUdvreCbcnrgpK-CE",
-            projectId = "youth-gym",
-            storageBucket = "youth-gym.firebasestorage.app"
-        )
-        
-        // Pada Desktop/JVM, gitlive-firebase butuh 'context' (stubbed Application) 
-        // untuk menghindari error casting "null cannot be cast to Context"
-        Firebase.initialize(Application(), options)
-        
-        isFirebaseInitialized = true
-        println("INFO: Firebase Desktop initialized successfully.")
-    } catch (e: Exception) {
-        if (e.message?.contains("already exists") == true || e.message?.contains("initialized") == true) {
+            val options = FirebaseOptions(
+                applicationId = "1:713442868886:android:40c655c252db2fda9bccb7",
+                apiKey = "AIzaSyCvGwpy_N4ZgEPfiPaUdvreCbcnrgpK-CE",
+                projectId = "youth-gym",
+                storageBucket = "youth-gym.firebasestorage.app"
+            )
+            
+            // Pada Desktop/JVM, gitlive-firebase butuh 'context' (stubbed Application) 
+            // untuk menghindari error casting "null cannot be cast to Context"
+            Firebase.initialize(Application(), options)
+            
             isFirebaseInitialized = true
-            println("INFO: Firebase already initialized.")
-        } else {
-            println("ERROR: Firebase Desktop init failed: ${e.message}")
-            e.printStackTrace()
+            println("INFO: Firebase Desktop initialized successfully.")
+        } catch (e: Exception) {
+            if (e.message?.contains("already exists") == true || e.message?.contains("initialized") == true) {
+                isFirebaseInitialized = true
+                println("INFO: Firebase already initialized.")
+            } else {
+                println("ERROR: Firebase Desktop init failed: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 }
+
+actual fun createStorageData(bytes: ByteArray): Data = TODO("Firebase Storage not supported on JVM yet")
+
+actual fun isStorageSupported(): Boolean = false
