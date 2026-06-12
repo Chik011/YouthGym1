@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +30,7 @@ actual fun MemberScanScreen(title: String, onResult: (String) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
-                Icons.Default.QrCodeScanner,
+                Icons.Default.PhotoCamera,
                 contentDescription = null,
                 tint = AccentBlue,
                 modifier = Modifier.size(80.dp)
@@ -83,7 +83,7 @@ actual fun MemberScanScreen(title: String, onResult: (String) -> Unit) {
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
-                Icon(Icons.Default.QrCodeScanner, null, tint = Color.White)
+                Icon(Icons.Default.PhotoCamera, null, tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Buka Kamera Scanner", color = Color.White, fontWeight = FontWeight.Bold)
             }

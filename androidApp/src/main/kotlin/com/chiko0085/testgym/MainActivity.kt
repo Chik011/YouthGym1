@@ -12,6 +12,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Inisialisasi context agar fitur platform (seperti buka WA/Web) bisa jalan di Android
+        setAndroidContext(this)
+
         setContent {
             App()
         }

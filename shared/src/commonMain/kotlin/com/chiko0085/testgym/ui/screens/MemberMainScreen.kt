@@ -405,9 +405,32 @@ fun MemberHomeScreen(member: Member) {
         Box(modifier = Modifier.fillMaxSize()) {
             MemberScanScreen(
                 title = "QR Code Alat",
-                onResult = { println("DEBUG: Tutorial Scan Result: $it") }
+                onResult = { scannedText ->
+                    // Menutup kamera setelah berhasil scan agar kembali ke dashboard
+                    showTutorialCamera = false
+
+                    // Normalisasi teks hasil scan (trim spasi)
+                    val cleanedText = scannedText.trim()
+
+                    // Cek apakah hasil scan berupa link URL
+                    if (cleanedText.startsWith("http://", ignoreCase = true) ||
+                        cleanedText.startsWith("https://", ignoreCase = true)) {
+                        
+                        openWebLink(cleanedText)
+                        println("DEBUG: Membuka link dari QR -> $cleanedText")
+
+                    } else if (cleanedText.contains(".") && !cleanedText.contains(" ")) {
+                        // Jika berisi titik dan tidak ada spasi, coba buka sebagai https (misal: google.com)
+                        openWebLink("https://$cleanedText")
+                        println("DEBUG: Membuka link (tanpa protocol) dari QR -> $cleanedText")
+                    } else {
+                        // Jika QR Code berisi teks biasa (bukan link), coba buka pencarian atau cetak log
+                        println("DEBUG: Format QR bukan URL: $cleanedText")
+                    }
+                }
             )
-            // Tombol X untuk menutup kamera
+
+            // Tombol X untuk menutup kamera manual
             IconButton(
                 onClick = { showTutorialCamera = false },
                 modifier = Modifier
@@ -418,7 +441,7 @@ fun MemberHomeScreen(member: Member) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
         }
-    } else {
+    }else {
         // --- TAMPILAN UTAMA HOME (SCROLL) ---
         Column(
             modifier = Modifier
@@ -538,7 +561,11 @@ fun MemberHomeScreen(member: Member) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Tombol WhatsApp → membuka aplikasi WhatsApp ke nomor admin
                 Button(
-                    onClick = { openWebLink("https://wa.me/+628123456789") },
+                    onClick = { 
+                        val message = "Halo Admin Youth Gym, saya ${member.name}. Saya ingin bertanya mengenai..."
+                        val encodedMessage = message.replace(" ", "%20")
+                        openWebLink("https://wa.me/6285166322618?text=$encodedMessage") 
+                    },
                     modifier = Modifier.weight(1f).height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     shape = RoundedCornerShape(16.dp)
@@ -686,8 +713,16 @@ fun MemberHomeScreen(member: Member) {
             trainer = selectedTrainer!!,
             onDismiss = { selectedTrainer = null },
             onContact = {
-                // Arahkan ke WhatsApp admin (bisa diganti ke nomor trainer jika ada field phone)
-                openWebLink("https://wa.me/628123456789")
+                val trainer = selectedTrainer!!
+                val phone = when {
+                    trainer.name.lowercase().contains("chiko") -> "62895329092414"
+                    trainer.name.lowercase().contains("gabriel") -> "6281281685858"
+                    trainer.name.lowercase().contains("marchel") -> "6282213337514"
+                    else -> "6285166322618" // Fallback to Admin
+                }
+                val message = "Halo Coach ${trainer.name}, saya ${member.name}. Saya tertarik untuk mengambil program latihan dengan Anda."
+                val encodedMessage = message.replace(" ", "%20")
+                openWebLink("https://wa.me/$phone?text=$encodedMessage")
                 selectedTrainer = null
             }
         )
@@ -1071,7 +1106,7 @@ fun PadelScreen(member: Member) {
                         val message = "Halo Admin Youth Gym, saya ${member.name} ingin booking lapangan Padel untuk tanggal $dateStr jam $hourStr. Apakah masih tersedia?"
                         // Encode spasi menjadi %20 untuk URL yang valid
                         val encodedMessage = message.replace(" ", "%20")
-                        openWebLink("https://wa.me/628123456789?text=$encodedMessage")
+                        openWebLink("https://wa.me/6285166322618?text=$encodedMessage")
                     })
                 }
             }

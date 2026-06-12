@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import android.content.Context
 
 class AndroidPlatform : Platform {
     override val name: String = "Android ${Build.VERSION.SDK_INT}"
@@ -15,25 +16,45 @@ class AndroidPlatform : Platform {
 
 actual fun getPlatform(): Platform = AndroidPlatform()
 
+// --- KODE BARU: Global Context untuk Android ---
+private var androidContext: Context? = null
+
+fun setAndroidContext(context: Context) {
+    androidContext = context
+}
+
 actual fun openWebLink(url: String) {
-    println("Membuka link di Android: $url")
+    val context = androidContext
+    if (context != null) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            println("INFO: Membuka link di Android: $url")
+        } catch (e: Exception) {
+            println("ERROR: Gagal membuka link: ${e.message}")
+        }
+    } else {
+        println("ERROR: Android Context belum diinisialisasi")
+    }
 }
 
 actual fun openEmailClient(recipient: String, subject: String, body: String) {
-    // This requires a context. In a real KMP app, you might pass the context or use a library.
-    // However, since we are in a simple setup, we can't easily get the context here without 
-    // changing the architecture. 
-    // As a workaround for this specific task, I will use a mailto: URI with openWebLink 
-    // if I can find where openWebLink is implemented properly or implement it here.
-    
-    val uriString = "mailto:$recipient" +
-            "?subject=${Uri.encode(subject)}" +
-            "&body=${Uri.encode(body)}"
-    
-    // We still need a way to start the activity. 
-    // Let's see if we can use a global context or similar.
-    // For now, I'll print it to avoid compilation errors if I can't find a context.
-    println("Request Email to $recipient: $subject\n$body")
+    val context = androidContext
+    if (context != null) {
+        try {
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:")
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+                putExtra(Intent.EXTRA_TEXT, body)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            println("ERROR: Gagal membuka email client: ${e.message}")
+        }
+    }
 }
 
 actual fun getCurrentTimeMillis(): Long {
@@ -42,7 +63,6 @@ actual fun getCurrentTimeMillis(): Long {
     return cal.timeInMillis
 }
 
-// --- TAMBAHAN BARU: Pekerja untuk mengubah angka menjadi teks kalender di Android ---
 actual fun formatEpochToDate(millis: Long): String {
     if (millis <= 0L) return "-"
     val sdf = SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("id", "ID"))

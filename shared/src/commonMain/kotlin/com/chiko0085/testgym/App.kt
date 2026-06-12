@@ -122,12 +122,18 @@ fun App() {
                     when (role) {
                         "admin" -> currentScreen = "admin"
                         "member" -> {
-                            loggedInMember = userObj as? Member
-                            currentScreen = "member"
+                            val member = userObj as? Member
+                            if (member != null) {
+                                loggedInMember = member
+                                currentScreen = "member"
+                            }
                         }
                         "trainer" -> {
-                            loggedInTrainer = userObj as? Trainer
-                            currentScreen = "trainer"
+                            val trainer = userObj as? Trainer
+                            if (trainer != null) {
+                                loggedInTrainer = trainer
+                                currentScreen = "trainer"
+                            }
                         }
                     }
                 },
