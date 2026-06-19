@@ -1,3 +1,5 @@
+// LoginScreen.kt - Layar masuk aplikasi
+
 package com.chiko0085.testgym.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -33,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.Member
-import com.chiko0085.testgym.Trainer
+import com.chiko0085.testgym.model.Trainer
 import com.chiko0085.testgym.ui.theme.TextSub
 import com.chiko0085.testgym.db
 import com.chiko0085.testgym.getCurrentTimeMillis
@@ -52,6 +54,7 @@ private val ErrorRed     = Color(0xFFEF4444)
 private val GlassWhite   = Color(0x14FFFFFF)
 private val GlassBorder  = Color(0x26FFFFFF)
 
+// Komponen layar login
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String, Any?) -> Unit,
@@ -220,7 +223,6 @@ fun LoginScreen(
                             isError = errorMessage.isNotEmpty()
                         )
 
-                        // TOMBOL LUPA PASSWORD
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                             TextButton(onClick = { showForgotPasswordDialog = true }) {
                                 Text("Lupa Password?", color = ArcBlue, fontSize = 12.sp)
@@ -262,7 +264,7 @@ fun LoginScreen(
                                         onLoginSuccess("trainer", trainer)
                                         return@Button
                                     }
-                                    errorMessage = "Username atau Password salah!"
+                                    errorMessage = "Login Gagal"
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
@@ -294,6 +296,7 @@ fun LoginScreen(
     }
 }
 
+// Dialog pemulihan kata sandi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForgotPasswordDialog(
@@ -303,8 +306,6 @@ fun ForgotPasswordDialog(
     var emailInput by remember { mutableStateOf("") }
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
-
-    val scope = rememberCoroutineScope()
     var isSending by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -355,7 +356,6 @@ fun ForgotPasswordDialog(
                                 Youth Gym Team
                             """.trimIndent()
                             
-                            // MEMBUKA APLIKASI GMAIL/EMAIL SECARA OTOMATIS
                             openEmailClient(
                                 recipient = member.email,
                                 subject = subject,
@@ -384,6 +384,7 @@ fun ForgotPasswordDialog(
     )
 }
 
+// Input teks kustom yang elegan
 @Composable
 private fun ElegantTextField(
     value: String,

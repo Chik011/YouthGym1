@@ -1,3 +1,5 @@
+// App.kt - Titik masuk utama aplikasi Compose
+
 package com.chiko0085.testgym
 
 import androidx.compose.material3.MaterialTheme
@@ -6,13 +8,16 @@ import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.GymPackage
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.model.PtPackage
+import com.chiko0085.testgym.model.Trainer
 import com.chiko0085.testgym.ui.screens.AdminDashboard
 import com.chiko0085.testgym.ui.screens.LoginScreen
 import com.chiko0085.testgym.ui.screens.MemberMainScreen
+import com.chiko0085.testgym.ui.screens.TrainerMainScreen
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.storage.storage
 import kotlinx.coroutines.launch
 
+// Komponen utama aplikasi
 @Composable
 fun App() {
     MaterialTheme {
@@ -20,7 +25,6 @@ fun App() {
         var loggedInMember by remember { mutableStateOf<Member?>(null) }
         var loggedInTrainer by remember { mutableStateOf<Trainer?>(null) }
 
-        // Data global yang bersifat reactive
         val members = remember { mutableStateListOf<Member>() }
         val gymPackages = remember { mutableStateListOf<GymPackage>() }
         val ptPackages = remember { mutableStateListOf<PtPackage>() }
@@ -29,13 +33,11 @@ fun App() {
         var adminAccount by remember { mutableStateOf(Admin()) }
         val scope = rememberCoroutineScope()
 
-        // Inisialisasi Firebase & Sync Data dalam satu aliran agar tidak race condition
+        // Sync data dari Firebase
         LaunchedEffect(Unit) {
             try {
-                // 1. Inisialisasi Firebase
                 initFirebase()
                 
-                // 2. Ambil Paket
                 val dbPackages = db.collection("gym_packages").get().documents.map { it.data<GymPackage>() }
                 if (dbPackages.isNotEmpty()) {
                     gymPackages.clear()
@@ -48,12 +50,10 @@ fun App() {
                     ))
                 }
                 
-                // 3. Ambil Member
                 val dbMembers = db.collection("members").get().documents.map { it.data<Member>() }
                 members.clear()
                 members.addAll(dbMembers)
 
-                // 4. Ambil PT Packages
                 try {
                     val dbPtPackages = db.collection("pt_packages").get().documents.map { it.data<PtPackage>() }
                     if (dbPtPackages.isNotEmpty()) {
@@ -70,7 +70,6 @@ fun App() {
                     println("DEBUG: Gagal ambil pt_packages: ${e.message}")
                 }
 
-                // 5. Ambil Trainer
                 val dbTrainers = db.collection("trainers").get().documents.map { it.data<Trainer>() }
                 val updatedTrainers = dbTrainers.map { trainer ->
                     val nameLower = trainer.name.lowercase()
@@ -84,28 +83,21 @@ fun App() {
                 trainers.clear()
                 trainers.addAll(updatedTrainers)
                 
-                // 6. Hitung revenue asli dari total bayar member
                 totalRevenue = members.sumOf { it.pricePaid ?: 0.0 }
 
-                // 7. Ambil Data Admin
                 try {
                     val adminDoc = db.collection("settings").document("admin_account").get()
                     if (adminDoc.exists) {
                         adminAccount = adminDoc.data<Admin>()
                     } else {
-                        // Jika belum ada di cloud, buat default
                         db.collection("settings").document("admin_account").set(Admin())
                     }
                 } catch (e: Exception) {
                     println("DEBUG: Gagal ambil admin account: ${e.message}")
                 }
-
-                println("DEBUG: Sync Cloud berhasil. Revenue: $totalRevenue, Trainer: ${trainers.size}")
                 
             } catch (e: Exception) {
-                println("DEBUG: Gagal sync data dari cloud: ${e.message}")
                 e.printStackTrace()
-                // Fallback jika cloud gagal
                 if (gymPackages.isEmpty()) {
                      gymPackages.addAll(listOf(
                         GymPackage("1", "Daily Pass", 25000.0, 1),
@@ -116,6 +108,7 @@ fun App() {
             }
         }
 
+        // Navigasi layar
         when (currentScreen) {
             "login" -> LoginScreen(
                 onLoginSuccess = { role, userObj ->
@@ -164,10 +157,7 @@ fun App() {
                 onUpdatePhotoClick = { imageBytes ->
                     scope.launch {
                         try {
-                            if (!isStorageSupported()) {
-                                println("DEBUG: Firebase Storage tidak didukung di platform ini (Desktop).")
-                                return@launch
-                            }
+                            if (!isStorageSupported()) return@launch
                             val memberId = loggedInMember?.id ?: return@launch
                             val storageRef = Firebase.storage.reference.child("members/$memberId/profile.jpg")
                             storageRef.putData(createStorageData(imageBytes))
@@ -181,17 +171,13 @@ fun App() {
                             if (loggedInMember?.id == updatedMember.id) loggedInMember = updatedMember
                             
                             db.collection("members").document(updatedMember.id).set(updatedMember)
-                            println("DEBUG: Upload foto member berhasil! URL: $downloadUrl")
-
                         } catch (e: Exception) {
-                            println("DEBUG: Gagal mengunggah foto member ke Storage: ${e.message}")
                             e.printStackTrace()
                         }
                     }
                 }
             )
             "trainer" -> {
-                // Gunakan state trainer terbaru dari list trainers utama agar reactive jika admin nambah jadwal
                 val liveTrainer = trainers.find { it.id == loggedInTrainer?.id } ?: loggedInTrainer!!
 
                 TrainerMainScreen(
@@ -213,22 +199,19 @@ fun App() {
                     onUpdatePhotoClick = { imageBytes ->
                         scope.launch {
                             try {
-                                if (!isStorageSupported()) {
-                                    println("DEBUG: Firebase Storage tidak didukung di platform ini (Desktop).")
-                                    return@launch
-                                }
-                                val storageRef = Firebase.storage.reference.child("trainers/${liveTrainer.id}/profile.jpg")
+                                if (!isStorageSupported()) return@launch
+                                val storageRef =
+                                    Firebase.storage.reference.child("trainers/${liveTrainer.id}/profile.jpg")
                                 storageRef.putData(createStorageData(imageBytes))
                                 val downloadUrl = storageRef.getDownloadUrl()
                                 val updatedTrainer = liveTrainer.copy(profileImageUrl = downloadUrl)
                                 val index = trainers.indexOfFirst { it.id == updatedTrainer.id }
                                 if (index != -1) trainers[index] = updatedTrainer
-                                if (loggedInTrainer?.id == updatedTrainer.id) loggedInTrainer = updatedTrainer
-                                db.collection("trainers").document(updatedTrainer.id).set(updatedTrainer)
-                                println("DEBUG: Upload foto berhasil! URL: $downloadUrl")
-
+                                if (loggedInTrainer?.id == updatedTrainer.id) loggedInTrainer =
+                                    updatedTrainer
+                                db.collection("trainers").document(updatedTrainer.id)
+                                    .set(updatedTrainer)
                             } catch (e: Exception) {
-                                println("DEBUG: Gagal mengunggah foto ke Storage: ${e.message}")
                                 e.printStackTrace()
                             }
                         }
@@ -239,7 +222,6 @@ fun App() {
                         scope.launch {
                             try {
                                 db.collection("members").document(updated.id).set(updated)
-                                println("DEBUG: Kouta PT ${updated.name} berhasil dikurangi. Sisa: ${updated.remainingPtSessions}")
                             } catch (e: Exception) {
                                 println("DEBUG: Gagal update kouta member: ${e.message}")
                             }

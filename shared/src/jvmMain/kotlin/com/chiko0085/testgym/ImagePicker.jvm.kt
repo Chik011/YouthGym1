@@ -1,3 +1,5 @@
+// ImagePicker.jvm.kt - Picker gambar platform JVM/Desktop
+
 package com.chiko0085.testgym
 
 import androidx.compose.runtime.Composable
@@ -5,12 +7,12 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 
+// Picker gambar native desktop
 @Composable
 actual fun rememberImagePicker(onResult: (ByteArray) -> Unit): () -> Unit {
     return {
         try {
-            // Membuka File Dialog bawaan Windows / MacOS / Linux secara native
-            val fileDialog = FileDialog(null as Frame?, "Pilih Foto Profil Coach", FileDialog.LOAD)
+            val fileDialog = FileDialog(null as Frame?, "Pilih Foto", FileDialog.LOAD)
             fileDialog.isVisible = true
 
             val file = fileDialog.file
@@ -18,7 +20,6 @@ actual fun rememberImagePicker(onResult: (ByteArray) -> Unit): () -> Unit {
 
             if (file != null && directory != null) {
                 val selectedFile = File(directory, file)
-                // Membaca file gambar lokal di laptop menjadi ByteArray lalu dikirim ke Firebase
                 onResult(selectedFile.readBytes())
             }
         } catch (e: Exception) {

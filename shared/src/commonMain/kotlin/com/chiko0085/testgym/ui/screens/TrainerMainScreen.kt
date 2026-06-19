@@ -1,6 +1,7 @@
-package com.chiko0085.testgym
+package com.chiko0085.testgym.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,16 +28,18 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chiko0085.testgym.model.Trainer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Import untuk Image Loader
 import io.kamel.image.KamelImage
 import io.kamel.image.asyncPainterResource
 import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.rememberImagePicker
 import org.jetbrains.compose.resources.painterResource
 import youthgym.shared.generated.resources.*
 
+// Layar utama trainer
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainerMainScreen(
@@ -102,7 +106,6 @@ fun TrainerMainScreen(
                     Column(modifier = Modifier.padding(20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
 
-                            // AVATAR AREA
                             Box(contentAlignment = Alignment.BottomEnd) {
                                 Box(
                                     modifier = Modifier
@@ -124,7 +127,7 @@ fun TrainerMainScreen(
                                                 else -> null
                                             }
                                             if (painter != null) {
-                                                androidx.compose.foundation.Image(
+                                                Image(
                                                     painter = painter,
                                                     contentDescription = "Profile Photo",
                                                     contentScale = ContentScale.Crop,
@@ -160,14 +163,12 @@ fun TrainerMainScreen(
 
                             Spacer(modifier = Modifier.width(20.dp))
 
-                            // INFO NAMA & BIO
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Coach ${displayTrainer.name}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(displayTrainer.description.ifEmpty { "Belum ada bio/portofolio yang ditulis." }, color = Color.LightGray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
                             }
 
-                            // TOMBOL PENGATURAN PROFIL & AKUN
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 IconButton(onClick = { showEditDialog = true }, modifier = Modifier.background(Color.White.copy(alpha = 0.1f), CircleShape).size(36.dp)) {
                                     Icon(Icons.Default.Settings, contentDescription = "Edit Profile", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -227,7 +228,6 @@ fun TrainerMainScreen(
             }
         }
 
-        // Dialog Edit Profil
         if (showEditDialog) {
             EditProfileDialog(
                 currentTrainer = displayTrainer,
@@ -240,7 +240,6 @@ fun TrainerMainScreen(
             )
         }
 
-        // Dialog Edit Akun (Username & Password)
         if (showAccountDialog) {
             AccountSettingsDialog(
                 currentTrainer = displayTrainer,
@@ -253,7 +252,6 @@ fun TrainerMainScreen(
             )
         }
 
-        // Dialog Absensi Member PT
         if (showAttendanceDialog) {
             AttendanceDialog(
                 memberList = memberList,
@@ -269,6 +267,7 @@ fun TrainerMainScreen(
     }
 }
 
+// Dialog absensi member PT
 @Composable
 fun AttendanceDialog(
     memberList: List<Member>,
@@ -276,8 +275,8 @@ fun AttendanceDialog(
     onMarkAttendance: (Member) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filteredMembers = memberList.filter { 
-        it.remainingPtSessions > 0 && it.name.contains(searchQuery, ignoreCase = true) 
+    val filteredMembers = memberList.filter {
+        it.remainingPtSessions > 0 && it.name.contains(searchQuery, ignoreCase = true)
     }
 
     AlertDialog(
@@ -309,7 +308,7 @@ fun AttendanceDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { 
+                                    .clickable {
                                         onMarkAttendance(member)
                                         onDismiss()
                                     }
@@ -337,8 +336,9 @@ fun AttendanceDialog(
     )
 }
 
+// Item statistik trainer
 @Composable
-fun TrainerStatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String, color: Color) {
+fun TrainerStatItem(icon: ImageVector, title: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.height(6.dp))
@@ -347,6 +347,7 @@ fun TrainerStatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title
     }
 }
 
+// Dialog edit portofolio
 @Composable
 fun EditProfileDialog(
     currentTrainer: Trainer,
@@ -429,6 +430,7 @@ fun EditProfileDialog(
     )
 }
 
+// Dialog keamanan akun trainer
 @Composable
 fun AccountSettingsDialog(
     currentTrainer: Trainer,

@@ -1,7 +1,7 @@
-package com.chiko0085.testgym
+package com.chiko0085.testgym.model
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class Trainer(

@@ -1,3 +1,5 @@
+// Member.kt - Model data member gym
+
 package com.chiko0085.testgym.model
 
 import kotlinx.serialization.Serializable
@@ -15,9 +17,9 @@ data class Member(
     var height: Double? = 0.0,
     var gender: String = "Laki-laki",
     var phoneNumber: String = "",
-    var email: String = "", // Tambahan untuk reset password
-    var pricePaid: Double? = 0.0,    // Tambahan untuk laporan keuangan
-    var packageName: String = "",   // Tambahan untuk laporan keuangan
-    var remainingPtSessions: Int = 0, // Sisa sesi Personal Trainer
-    var profileImageUrl: String = "" // Foto profil member
+    var email: String = "",
+    var pricePaid: Double? = 0.0,
+    var packageName: String = "",
+    var remainingPtSessions: Int = 0,
+    var profileImageUrl: String = ""
 )

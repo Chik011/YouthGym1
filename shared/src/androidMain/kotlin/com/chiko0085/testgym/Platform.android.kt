@@ -1,3 +1,5 @@
+// Platform.android.kt - Implementasi platform Android
+
 package com.chiko0085.testgym
 
 import dev.gitlive.firebase.storage.Data
@@ -16,13 +18,14 @@ class AndroidPlatform : Platform {
 
 actual fun getPlatform(): Platform = AndroidPlatform()
 
-// --- KODE BARU: Global Context untuk Android ---
 private var androidContext: Context? = null
 
+// Menyimpan referensi context aplikasi
 fun setAndroidContext(context: Context) {
     androidContext = context
 }
 
+// Buka tautan web di browser android
 actual fun openWebLink(url: String) {
     val context = androidContext
     if (context != null) {
@@ -30,15 +33,13 @@ actual fun openWebLink(url: String) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
-            println("INFO: Membuka link di Android: $url")
         } catch (e: Exception) {
             println("ERROR: Gagal membuka link: ${e.message}")
         }
-    } else {
-        println("ERROR: Android Context belum diinisialisasi")
     }
 }
 
+// Buka antarmuka email android
 actual fun openEmailClient(recipient: String, subject: String, body: String) {
     val context = androidContext
     if (context != null) {
@@ -74,16 +75,13 @@ actual fun parseDateToMillis(dateStr: String): Long? {
     return try {
         val parts = dateStr.trim().split(" ")
         if (parts.size != 3) return null
-        
         val day = parts[0].toInt()
         val monthStr = parts[1].lowercase()
         val year = parts[2].toInt()
-        
         val monthIdx = listOf("januari", "februari", "maret", "april", "mei", "juni", 
                               "juli", "agustus", "september", "oktober", "november", "desember")
                               .indexOf(monthStr)
         if (monthIdx == -1) return null
-        
         val tz = TimeZone.getTimeZone("Asia/Jakarta")
         val cal = java.util.Calendar.getInstance(tz)
         cal.set(year, monthIdx, day, 0, 0, 0)
@@ -94,9 +92,7 @@ actual fun parseDateToMillis(dateStr: String): Long? {
     }
 }
 
-actual fun initFirebase() {
-    // Di Android sudah otomatis via google-services.json
-}
+actual fun initFirebase() { }
 
 actual fun createStorageData(bytes: ByteArray): Data = Data(bytes)
 

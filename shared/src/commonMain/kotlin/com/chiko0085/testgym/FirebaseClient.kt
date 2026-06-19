@@ -1,11 +1,13 @@
+// FirebaseClient.kt - Konfigurasi client Firebase
+
 package com.chiko0085.testgym
 
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.storage.storage
 
+// Inisialisasi Firestore via lazy loading
 val db by lazy { 
-    // Pastikan inisialisasi dipanggil sebelum akses firestore
     try {
         initFirebase()
     } catch (e: Exception) {
@@ -14,4 +16,5 @@ val db by lazy {
     Firebase.firestore 
 }
 
+// Inisialisasi Storage via lazy loading
 val storage by lazy { Firebase.storage }
