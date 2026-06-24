@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.GymPackage
 import com.chiko0085.testgym.model.Member
+import com.chiko0085.testgym.model.PtPackage
 import com.chiko0085.testgym.ui.screens.AdminDashboard
 import com.chiko0085.testgym.ui.screens.LoginScreen
 import com.chiko0085.testgym.ui.screens.MemberMainScreen
@@ -20,6 +21,7 @@ fun App() {
         // Data global yang bersifat reactive
         val members = remember { mutableStateListOf<Member>() }
         val gymPackages = remember { mutableStateListOf<GymPackage>() }
+        val ptPackages = remember { mutableStateListOf<PtPackage>() }
         val trainers = remember { mutableStateListOf<Trainer>() }
         var totalRevenue by remember { mutableDoubleStateOf(0.0) }
         var adminAccount by remember { mutableStateOf(Admin()) }
@@ -40,6 +42,17 @@ fun App() {
                         GymPackage("1", "Daily Pass", 25000.0, 1),
                         GymPackage("2", "Monthly Basic", 250000.0, 30),
                         GymPackage("3", "3 Months Pro", 650000.0, 90)
+                    ))
+                }
+
+                val dbPtPackages = db.collection("pt_packages").get().documents.map { it.data<PtPackage>() }
+                if (dbPtPackages.isNotEmpty()) {
+                    ptPackages.clear()
+                    ptPackages.addAll(dbPtPackages)
+                } else {
+                    ptPackages.addAll(listOf(
+                        PtPackage("1", "Personal Training 1", 150000.0, 1),
+                        PtPackage("2", "Personal Training 10", 1300000.0, 10)
                     ))
                 }
                 
@@ -105,6 +118,7 @@ fun App() {
             "admin" -> AdminDashboard(
                 members = members,
                 gymPackages = gymPackages,
+                ptPackages = ptPackages,
                 trainers = trainers,
                 totalRevenue = totalRevenue,
                 adminAccount = adminAccount,
@@ -115,7 +129,14 @@ fun App() {
             "member" -> MemberMainScreen(
                 initialMember = loggedInMember!!,
                 memberList = members,
-                onLogout = { currentScreen = "login" }
+                onLogout = { currentScreen = "login" },
+                onUpdateMember = { updatedMember ->
+                    loggedInMember = updatedMember
+                    val index = members.indexOfFirst { it.id == updatedMember.id }
+                    if (index != -1) {
+                        members[index] = updatedMember
+                    }
+                }
             )
             "trainer" -> {
                 // Gunakan state trainer terbaru dari list trainers utama agar reactive jika admin nambah jadwal

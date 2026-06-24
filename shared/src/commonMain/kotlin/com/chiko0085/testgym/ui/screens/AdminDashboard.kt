@@ -444,7 +444,7 @@ fun AdminDashboard(
         var dayDropdownExpanded by remember { mutableStateOf(false) }
         var editingIndex by remember { mutableStateOf<Int?>(null) }
 
-        val availableDays = trainerForSchedule?.availability ?: listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
+        val availableDays = listOf("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 
         AlertDialog(
             onDismissRequest = { trainerForSchedule = null },
