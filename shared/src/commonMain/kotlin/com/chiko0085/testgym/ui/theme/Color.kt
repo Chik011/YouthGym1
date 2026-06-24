@@ -17,3 +17,19 @@ val CardDark = Color(0xFF112240)
 val AccentBlue = Color(0xFF3B82F6)
 val AccentBlueDark = Color(0xFF1D4ED8)
 val TextSub = Color(0xFF94A3B8)
+
+// Login Specific Colors
+val NightBlack = Color(0xFF0A0F1A)
+val DeepNavy = Color(0xFF111827)
+val NeonBlue = Color(0xFF3B82F6)
+val ElectricCyan = Color(0xFF06B6D4)
+val GlassWhite = Color(0xFFFFFFFF).copy(alpha = 0.05f)
+
+// Status & Accent Colors
+val SuccessGreen = Color(0xFF10B981)
+val SuccessGreenLight = Color(0xFF34D399)
+val ErrorRed = Color(0xFFEF4444)
+val ErrorRedLight = Color(0xFFF87171)
+val WarningYellow = Color(0xFFFBBF24)
+val AccentPurple = Color(0xFF8B5CF6)
+val AccentPink = Color(0xFFEC4899)
