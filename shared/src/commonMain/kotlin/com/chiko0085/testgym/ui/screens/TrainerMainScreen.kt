@@ -23,8 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,7 +47,7 @@ fun TrainerMainScreen(
     onLogout: () -> Unit,
     onSaveProfile: (Trainer) -> Unit,
     onUpdatePhotoClick: (ByteArray) -> Unit,
-    onUpdateMember: (Member) -> Unit
+    onUpdateMember: (Member) -> Unit,
 ) {
     val bgGradient = Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A192F)))
     val scope = rememberCoroutineScope()
@@ -258,7 +256,15 @@ fun TrainerMainScreen(
                 memberList = memberList,
                 onDismiss = { showAttendanceDialog = false },
                 onMarkAttendance = { member ->
-                    if (member.remainingPtSessions > 0) {
+                    val currentTime = com.chiko0085.testgym.getCurrentTimeMillis()
+                    
+                    // Cek jika sudah lewat sebulan (ptExpiredDate)
+                    if (member.ptExpiredDate > 0 && currentTime > member.ptExpiredDate) {
+                        // Paket HANGUS karena sudah sebulan
+                        val updatedMember = member.copy(remainingPtSessions = 0)
+                        onUpdateMember(updatedMember)
+                    } else if (member.remainingPtSessions > 0) {
+                        // Masih berlaku, kurangi 1 sesi
                         val updatedMember = member.copy(remainingPtSessions = member.remainingPtSessions - 1)
                         onUpdateMember(updatedMember)
                     }
@@ -280,4 +286,4 @@ fun TrainerStatItem(icon: ImageVector, title: String, value: String, color: Colo
         Text(title, color = Color.Gray, fontSize = 10.sp)
     }
 }
-
+

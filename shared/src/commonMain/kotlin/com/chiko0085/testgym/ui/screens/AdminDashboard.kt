@@ -357,7 +357,7 @@ fun AdminDashboard(
         AddMemberDialog(
             packages = gymPackages,
             onDismiss = { showAddDialog = false },
-            onConfirm = { n, u, p, e, g, hp, d, pt, price, joinDate, pkgName ->
+            onConfirm = { n, u, p, g, hp, d, pt, price, joinDate, pkgName ->
                 scope.launch {
                     try {
                         val expirationTime = joinDate + (d * 86400000L)
@@ -374,7 +374,7 @@ fun AdminDashboard(
                             height = 0.0,
                             gender = g,
                             phoneNumber = hp,
-                            email = e,
+                            email = "",
                             pricePaid = price,
                             packageName = pkgName,
                             remainingPtSessions = pt
@@ -389,7 +389,7 @@ fun AdminDashboard(
                             "name" to n,
                             "username" to u,
                             "password" to p,
-                            "email" to e,
+                            "email" to "",
                             "gender" to g,
                             "phoneNumber" to hp,
                             "remainingDays" to d,
@@ -416,25 +416,29 @@ fun AdminDashboard(
             onConfirm = { updated ->
                 scope.launch {
                     try {
-                        val idx = members.indexOfFirst { it.id == updated.id }
-                        if (idx != -1) members[idx] = updated
+                        // Hitung ulang expiredDate berdasarkan remainingDays yang baru diinput
+                        val newExpiredDate = getCurrentTimeMillis() + (updated.remainingDays * 86400000L)
+                        val finalMember = updated.copy(expiredDate = newExpiredDate)
+                        
+                        val idx = members.indexOfFirst { it.id == finalMember.id }
+                        if (idx != -1) members[idx] = finalMember
                         memberToEdit = null
 
                         val data = mapOf(
-                            "name" to updated.name,
-                            "username" to updated.username,
-                            "password" to updated.password,
-                            "email" to updated.email,
-                            "phoneNumber" to updated.phoneNumber,
-                            "remainingDays" to updated.remainingDays,
-                            "remainingPtSessions" to updated.remainingPtSessions,
-                            "joinDate" to updated.joinDate,
-                            "expiredDate" to updated.expiredDate,
-                            "weight" to updated.weight,
-                            "height" to updated.height,
-                            "gender" to updated.gender
+                            "name" to finalMember.name,
+                            "username" to finalMember.username,
+                            "password" to finalMember.password,
+                            "email" to "",
+                            "phoneNumber" to finalMember.phoneNumber,
+                            "remainingDays" to finalMember.remainingDays,
+                            "remainingPtSessions" to finalMember.remainingPtSessions,
+                            "joinDate" to finalMember.joinDate,
+                            "expiredDate" to finalMember.expiredDate,
+                            "weight" to finalMember.weight,
+                            "height" to finalMember.height,
+                            "gender" to finalMember.gender
                         )
-                        db.collection("members").document(updated.id).update(data)
+                        db.collection("members").document(finalMember.id).update(data)
                     } catch (e: Exception) {}
                 }
             }

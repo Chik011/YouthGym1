@@ -37,11 +37,7 @@ import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.model.Trainer
 import com.chiko0085.testgym.ui.theme.TextSub
-import com.chiko0085.testgym.db
-import com.chiko0085.testgym.getCurrentTimeMillis
 import com.chiko0085.testgym.openEmailClient
-import kotlinx.coroutines.launch
-import com.chiko0085.testgym.ui.screens.auth.dialogs.*
 private val NightBlack   = Color(0xFF080C14)
 private val DeepNavy     = Color(0xFF0A1628)
 private val NavyMid      = Color(0xFF0D1F3C)
@@ -297,6 +293,86 @@ fun LoginScreen(
 }
 
 // Dialog pemulihan kata sandi
+@Composable
+private fun ForgotPasswordDialog(
+    memberList: List<Member>,
+    onDismiss: () -> Unit
+) {
+    var identifier by remember { mutableStateOf("") }
+    var resultMessage by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DeepNavy,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSub,
+        title = { Text("Lupa Password", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Masukkan Username atau Email Anda untuk memulihkan kata sandi.",
+                    fontSize = 14.sp,
+                    color = TextSub
+                )
+
+                OutlinedTextField(
+                    value = identifier,
+                    onValueChange = { identifier = it; resultMessage = "" },
+                    label = { Text("Username / Email", color = TextSub) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = NeonBlue,
+                        unfocusedBorderColor = GlassBorder,
+                        cursorColor = NeonBlue
+                    )
+                )
+
+                if (resultMessage.isNotEmpty()) {
+                    Text(
+                        text = resultMessage,
+                        color = if (isError) ErrorRed else ArcBlue,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val member = memberList.find {
+                        it.username.equals(identifier, ignoreCase = true) ||
+                                it.email.equals(identifier, ignoreCase = true)
+                    }
+                    if (member != null) {
+                        isError = false
+                        resultMessage = "Akun ditemukan! Silakan cek email Anda."
+                        openEmailClient(
+                            member.email,
+                            "Pemulihan Kata Sandi Youth Gym",
+                            "Halo ${member.name},\n\nAnda meminta pemulihan kata sandi.\nUsername: ${member.username}\nPassword: ${member.password}\n\nSilakan gunakan data tersebut untuk masuk kembali."
+                        )
+                    } else {
+                        isError = true
+                        resultMessage = "Akun tidak ditemukan!"
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+            ) {
+                Text("Kirim Detail", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal", color = TextSub)
+            }
+        }
+    )
+}
 
 // Input teks kustom yang elegan
 @Composable

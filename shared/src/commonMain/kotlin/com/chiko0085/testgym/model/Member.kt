@@ -21,5 +21,6 @@ data class Member(
     var pricePaid: Double? = 0.0,
     var packageName: String = "",
     var remainingPtSessions: Int = 0,
+    var ptExpiredDate: Long = 0L,
     var profileImageUrl: String = ""
 )

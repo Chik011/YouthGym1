@@ -147,7 +147,6 @@ fun App() {
             )
             "member" -> MemberMainScreen(
                 initialMember = loggedInMember!!,
-                memberList = members,
                 onLogout = { currentScreen = "login" },
                 onUpdateMember = { updated ->
                     val index = members.indexOfFirst { it.id == updated.id }

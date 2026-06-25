@@ -65,13 +65,30 @@ import com.chiko0085.testgym.ui.screens.member.*
 @Composable
 fun MemberMainScreen(
     initialMember: Member,
-    memberList: List<Member>,
     onLogout: () -> Unit,
     onUpdateMember: (Member) -> Unit,
     onUpdatePhotoClick: (ByteArray) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val currentMember = memberList.find { it.id == initialMember.id } ?: initialMember
+    
+    // Gunakan state untuk member agar reaktif terhadap snapshot
+    var currentMember by remember { mutableStateOf(initialMember) }
+
+    // Dapatkan data member paling update dari Firebase secara real-time
+    LaunchedEffect(initialMember.id) {
+        try {
+            db.collection("members").document(initialMember.id).snapshots.collect { snapshot ->
+                if (snapshot.exists) {
+                    val updated = snapshot.data<Member>()
+                    currentMember = updated
+                    onUpdateMember(updated)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     val bgGradient = Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd))
 
     Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
