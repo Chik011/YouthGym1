@@ -38,6 +38,7 @@ fun MemberManagementScreen(
     members: List<Member>,
     gymPackages: List<GymPackage>,
     ptPackages: List<PtPackage>,
+    admin: com.chiko0085.testgym.model.Admin,
     onCheckIn: (Member) -> Unit,
     onEdit: (Member) -> Unit,
     onDelete: (Member) -> Unit,
@@ -84,7 +85,11 @@ fun MemberManagementScreen(
                     title = { Text("Manajemen Member Gym", color = Color.White, fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
-                    actions = { IconButton(onClick = onAddMember) { Icon(Icons.Default.Add, "Tambah Member", tint = Color.White) } }
+                    actions = { 
+                        if (admin.role == "super_admin" || admin.permissions.contains("members_add") || admin.permissions.contains("members")) {
+                            IconButton(onClick = onAddMember) { Icon(Icons.Default.Add, "Tambah Member", tint = Color.White) } 
+                        }
+                    }
                 )
             }
         ) { padding ->
@@ -138,6 +143,7 @@ fun MemberManagementScreen(
                             items(currentList) { member ->
                                 MemberCard(
                                     member = member,
+                                    admin = admin,
                                     onCheckIn = { onCheckIn(member) },
                                     onEdit = { onEdit(member) },
                                     onDelete = { onDelete(member) },

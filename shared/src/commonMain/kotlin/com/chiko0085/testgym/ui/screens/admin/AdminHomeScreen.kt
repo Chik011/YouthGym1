@@ -1,7 +1,9 @@
 package com.chiko0085.testgym.ui.screens.admin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,11 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -31,6 +30,7 @@ import com.chiko0085.testgym.util.generateRevenueHtml
 import com.chiko0085.testgym.getCurrentTimeMillis
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.model.Trainer
+import com.chiko0085.testgym.model.Transaction
 import com.chiko0085.testgym.ui.components.CalendarCard
 import com.chiko0085.testgym.ui.theme.AccentBlue
 import com.chiko0085.testgym.ui.theme.CardDark
@@ -47,19 +47,18 @@ import youthgym.shared.generated.resources.pt_marchel
 fun AdminHomeScreen(
     members: List<Member>,
     trainers: SnapshotStateList<Trainer>,
+    transactions: List<Transaction>,
+    admin: com.chiko0085.testgym.model.Admin,
     totalRevenue: Double,
     onResetRevenue: () -> Unit,
     onTrainerClick: (Trainer) -> Unit,
+    onViewDetail: () -> Unit,
     snackbarHostState: SnackbarHostState,
     isDesktop: Boolean
 ) {
+    var selectedFilterText by remember { mutableStateOf("Hari Ini") }
     var filterExpanded by remember { mutableStateOf(false) }
-    var selectedFilterText by remember { mutableStateOf("Semua Waktu") }
-    val filterOptions = listOf(
-        "Semua Waktu", "1 Bulan Terakhir", "2 Bulan Terakhir", "3 Bulan Terakhir",
-        "4 Bulan Terakhir", "5 Bulan Terakhir", "6 Bulan Terakhir", "7 Bulan Terakhir",
-        "8 Bulan Terakhir", "9 Bulan Terakhir", "10 Bulan Terakhir", "11 Bulan Terakhir", "1 Tahun Terakhir"
-    )
+    val filterOptions = listOf("Hari Ini", "7 Hari Terakhir", "30 Hari Terakhir", "Semua Waktu")
     val scope = rememberCoroutineScope()
 
     var startAnimation by remember { mutableStateOf(false) }
@@ -77,110 +76,119 @@ fun AdminHomeScreen(
         modifier = Modifier.fillMaxSize().padding(horizontal = if(isDesktop) 32.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
+        item { 
             Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                elevation = CardDefaults.cardElevation(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF1D4ED8), Color(0xFF3B82F6))))
-                ) {
-                    Column(modifier = Modifier.padding(28.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AccountCircle, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Total Revenue", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
-                        }
-                        Text("Rp ${formatRupiah(animatedRevenue.toDouble())}", color = Color.White, fontSize = if(isDesktop) 46.sp else 32.sp, fontWeight = FontWeight.Black)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${members.size} Total Members Aktif", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
-                        TextButton(onClick = onResetRevenue) {
-                            Icon(Icons.Default.Refresh, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Reset Pendapatan", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                        }
-                    }
+            CalendarCard() 
+        }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Rentang Filter Excel:", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                        Box {
-                            TextButton(
-                                onClick = { filterExpanded = true },
-                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.background(Color.White.copy(alpha = 0.15f))
-                            ) {
-                                Text(selectedFilterText, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp))
+        if (admin.role == "super_admin" || admin.permissions.contains("revenue_view")) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.6f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Laporan Keuangan", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("Ringkasan transaksi gym", color = Color.Gray, fontSize = 12.sp)
                             }
-                            DropdownMenu(
-                                expanded = filterExpanded,
-                                onDismissRequest = { filterExpanded = false }
-                            ) {
-                                filterOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            selectedFilterText = option
-                                            filterExpanded = false
-                                        }
-                                    )
+                            
+                            Box {
+                                TextButton(
+                                    onClick = { filterExpanded = true },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                    modifier = Modifier.background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                ) {
+                                    Text(selectedFilterText, fontSize = 12.sp)
+                                    Icon(Icons.Default.ArrowDropDown, null)
+                                }
+                                DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
+                                    filterOptions.forEach { option ->
+                                        DropdownMenuItem(text = { Text(option) }, onClick = { selectedFilterText = option; filterExpanded = false })
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            val nowTime = getCurrentTimeMillis()
-                            val filteredForExcel = when (selectedFilterText) {
-                                "1 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (1 * 30 * 86400000L) }
-                                "2 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (2 * 30 * 86400000L) }
-                                "3 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (3 * 30 * 86400000L) }
-                                "4 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (4 * 30 * 86400000L) }
-                                "5 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (5 * 30 * 86400000L) }
-                                "6 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (6 * 30 * 86400000L) }
-                                "7 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (7 * 30 * 86400000L) }
-                                "8 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (8 * 30 * 86400000L) }
-                                "9 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (9 * 30 * 86400000L) }
-                                "10 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (10 * 30 * 86400000L) }
-                                "11 Bulan Terakhir" -> members.filter { it.joinDate >= nowTime - (11 * 30 * 86400000L) }
-                                "1 Tahun Terakhir" -> members.filter { it.joinDate >= nowTime - (365 * 86400000L) }
-                                else -> members
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        val currentTotal = remember(transactions, selectedFilterText) {
+                            val now = getCurrentTimeMillis()
+                            when (selectedFilterText) {
+                                "Hari Ini" -> {
+                                    val startOfDay = now - (now % 86400000L)
+                                    transactions.filter { it.timestamp >= startOfDay }.sumOf { it.amount }
+                                }
+                                "7 Hari Terakhir" -> transactions.filter { it.timestamp >= now - (7 * 86400000L) }.sumOf { it.amount }
+                                "30 Hari Terakhir" -> transactions.filter { it.timestamp >= now - (30 * 86400000L) }.sumOf { it.amount }
+                                else -> totalRevenue
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("Rp", color = Color.Gray, fontSize = 18.sp, modifier = Modifier.padding(bottom = 6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(formatRupiah(currentTotal), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(
+                                onClick = onViewDetail,
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.List, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("View Detail", fontSize = 13.sp)
                             }
 
-                            val html = generateRevenueHtml(filteredForExcel, selectedFilterText)
-                            exportToExcel(html)
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Laporan ($selectedFilterText) berhasil diunduh")
+                            OutlinedButton(
+                                onClick = {
+                                    val nowTime = getCurrentTimeMillis()
+                                    val filteredForExcel = when (selectedFilterText) {
+                                        "Hari Ini" -> {
+                                            val startOfDay = nowTime - (nowTime % 86400000L)
+                                            members.filter { it.joinDate >= startOfDay }
+                                        }
+                                        "7 Hari Terakhir" -> members.filter { it.joinDate >= nowTime - (7 * 86400000L) }
+                                        "30 Hari Terakhir" -> members.filter { it.joinDate >= nowTime - (30 * 86400000L) }
+                                        else -> members
+                                    }
+                                    val html = generateRevenueHtml(filteredForExcel, selectedFilterText)
+                                    exportToExcel(html)
+                                    scope.launch { snackbarHostState.showSnackbar("Laporan ($selectedFilterText) diunduh") }
+                                },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                border = BorderStroke(1.dp, AccentBlue),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue)
+                            ) {
+                                Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Download Excel", fontSize = 13.sp)
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null, tint = Color(0xFF1D4ED8))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Unduh Laporan Excel (CSV)", color = Color(0xFF1D4ED8), fontWeight = FontWeight.Bold)
+                        }
+                        
+                        if (admin.role == "super_admin" || admin.permissions.contains("revenue_reset")) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = onResetRevenue, modifier = Modifier.fillMaxWidth()) {
+                                Text("Reset Histori Pendapatan", color = Color.Red.copy(alpha = 0.6f), fontSize = 11.sp)
+                            }
+                        }
                     }
-                }
                 }
             }
         }
-
-        item { CalendarCard() }
 
         item {
             Text("Personal Trainer Aktif", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccentBlue, modifier = Modifier.padding(vertical = 8.dp))

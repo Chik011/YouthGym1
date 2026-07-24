@@ -17,20 +17,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chiko0085.testgym.formatEpochToDate
 import com.chiko0085.testgym.getCurrentTimeMillis
+import com.chiko0085.testgym.model.Admin
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.model.Reservation
 import com.chiko0085.testgym.ui.theme.*
 
-// Kartu list member
 @Composable
 fun MemberCard(
     member: Member,
+    admin: Admin,
     onCheckIn: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onExtend: () -> Unit,
     onBuyPt: () -> Unit
 ) {
+    val canCheckIn = admin.role == "super_admin" || admin.permissions.contains("members_checkin") || admin.permissions.contains("members")
+    val canEdit = admin.role == "super_admin" || admin.permissions.contains("members_edit") || admin.permissions.contains("members")
+    val canDelete = admin.role == "super_admin" || admin.permissions.contains("members_delete") || admin.permissions.contains("members")
+    val canExtend = admin.role == "super_admin" || admin.permissions.contains("members_extend") || admin.permissions.contains("members")
+    val canBuyPt = admin.role == "super_admin" || admin.permissions.contains("members_pt") || admin.permissions.contains("members")
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -75,32 +82,38 @@ fun MemberCard(
                     Text("Sisa Sesi PT: ${member.remainingPtSessions}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    IconButton(onClick = onCheckIn) { Icon(Icons.Default.CheckCircle, "Check-in", tint = SuccessGreen) }
-                    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit", tint = Color.LightGray) }
-                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Hapus", tint = ErrorRedLight) }
+                    if (canCheckIn) IconButton(onClick = onCheckIn) { Icon(Icons.Default.CheckCircle, "Check-in", tint = SuccessGreen) }
+                    if (canEdit) IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Edit", tint = Color.LightGray) }
+                    if (canDelete) IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Hapus", tint = ErrorRedLight) }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onExtend,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Perpanjang Paket", color = Color.White, fontSize = 11.sp)
-                }
-                Button(
-                    onClick = onBuyPt,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sewa PT", color = Color.White, fontSize = 11.sp)
+            if (canExtend || canBuyPt) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (canExtend) {
+                        Button(
+                            onClick = onExtend,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Perpanjang Paket", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                    if (canBuyPt) {
+                        Button(
+                            onClick = onBuyPt,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.2f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sewa PT", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }

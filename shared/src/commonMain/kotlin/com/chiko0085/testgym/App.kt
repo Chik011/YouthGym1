@@ -2,18 +2,18 @@
 
 package com.chiko0085.testgym
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import com.chiko0085.testgym.model.Admin
-import com.chiko0085.testgym.model.GymPackage
-import com.chiko0085.testgym.model.Member
-import com.chiko0085.testgym.model.PtPackage
-import com.chiko0085.testgym.model.Trainer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.chiko0085.testgym.model.*
 import com.chiko0085.testgym.ui.screens.AdminDashboard
 import com.chiko0085.testgym.ui.screens.LoginScreen
 import com.chiko0085.testgym.ui.screens.MemberMainScreen
 import com.chiko0085.testgym.ui.screens.TrainerMainScreen
+import com.chiko0085.testgym.util.AdminLogger
 import dev.gitlive.firebase.Firebase
+import dev.gitlive.firebase.firestore.*
 import dev.gitlive.firebase.storage.storage
 import kotlinx.coroutines.launch
 
@@ -29,14 +29,44 @@ fun App() {
         val gymPackages = remember { mutableStateListOf<GymPackage>() }
         val ptPackages = remember { mutableStateListOf<PtPackage>() }
         val trainers = remember { mutableStateListOf<Trainer>() }
+        val admins = remember { mutableStateListOf<Admin>() }
+        val workoutSessions = remember { mutableStateListOf<com.chiko0085.testgym.model.WorkoutSession>() }
+        val transactions = remember { mutableStateListOf<com.chiko0085.testgym.model.Transaction>() }
         var totalRevenue by remember { mutableDoubleStateOf(0.0) }
-        var adminAccount by remember { mutableStateOf(Admin()) }
+        var loggedInAdmin by remember { mutableStateOf<Admin?>(null) }
+        
+        // --- SISTEM UPDATE OTOMATIS ---
+        var showUpdateDialog by remember { mutableStateOf(false) }
+        var latestVersionName by remember { mutableStateOf("") }
+        val currentVersion = 1 // Update angka ini setiap kali Anda build versi baru (2, 3, dst)
+        val downloadUrl = "https://drive.google.com/drive/folders/17ORzovSJAXRiHUel96c-az02xCgBiMR_?usp=sharing"
+        
         val scope = rememberCoroutineScope()
 
         // Sync data dari Firebase
         LaunchedEffect(Unit) {
             try {
                 initFirebase()
+
+                // Cek Update Versi dari Firestore
+                try {
+                    val versionDoc = db.collection("settings").document("app_version").get()
+                    if (versionDoc.exists) {
+                        val remoteVersion = versionDoc.get<Long?>("version_code")?.toInt() ?: 1
+                        latestVersionName = versionDoc.get<String?>("version_name") ?: "v1.0.0"
+                        if (remoteVersion > currentVersion) {
+                            showUpdateDialog = true
+                        }
+                    } else {
+                        // Jika dokumen belum ada, buat default di Firestore
+                        db.collection("settings").document("app_version").set(mapOf(
+                            "version_code" to 1,
+                            "version_name" to "v1.0.0"
+                        ))
+                    }
+                } catch (e: Exception) {
+                    println("DEBUG: Gagal cek update: ${e.message}")
+                }
                 
                 val dbPackages = db.collection("gym_packages").get().documents.map { it.data<GymPackage>() }
                 if (dbPackages.isNotEmpty()) {
@@ -83,17 +113,43 @@ fun App() {
                 trainers.clear()
                 trainers.addAll(updatedTrainers)
                 
+                try {
+                    val dbWorkouts = db.collection("workout_sessions").get().documents.map { it.data<com.chiko0085.testgym.model.WorkoutSession>() }
+                    workoutSessions.clear()
+                    workoutSessions.addAll(dbWorkouts)
+                } catch (e: Exception) {
+                    println("DEBUG: Gagal ambil workout_sessions: ${e.message}")
+                }
+                
+                try {
+                    val dbTransactions = db.collection("transactions").get().documents.map { it.data<com.chiko0085.testgym.model.Transaction>() }
+                    transactions.clear()
+                    transactions.addAll(dbTransactions)
+                } catch (e: Exception) {
+                    println("DEBUG: Gagal ambil transactions: ${e.message}")
+                }
+                
                 totalRevenue = members.sumOf { it.pricePaid ?: 0.0 }
 
                 try {
-                    val adminDoc = db.collection("settings").document("admin_account").get()
-                    if (adminDoc.exists) {
-                        adminAccount = adminDoc.data<Admin>()
+                    val dbAdmins = db.collection("admins").get().documents.map { it.data<Admin>() }
+                    admins.clear()
+                    if (dbAdmins.isEmpty()) {
+                        val fullPermissions = listOf(
+                            "dashboard", "revenue_view", "revenue_reset", "members", "members_add", "members_checkin", 
+                            "members_edit", "members_delete", "members_extend", "members_pt", 
+                            "packages", "pt_packages", "trainers", "workouts", "reservations", "wa_broadcast"
+                        )
+                        val superAdmin = Admin("sadmin", "sadmin123", "super_admin", fullPermissions)
+                        val defaultAdmin = Admin("admin", "admin123", "admin", fullPermissions)
+                        admins.addAll(listOf(superAdmin, defaultAdmin))
+                        db.collection("admins").document("sadmin").set(superAdmin)
+                        db.collection("admins").document("admin").set(defaultAdmin)
                     } else {
-                        db.collection("settings").document("admin_account").set(Admin())
+                        admins.addAll(dbAdmins)
                     }
                 } catch (e: Exception) {
-                    println("DEBUG: Gagal ambil admin account: ${e.message}")
+                    println("DEBUG: Gagal ambil admins: ${e.message}")
                 }
                 
             } catch (e: Exception) {
@@ -113,7 +169,10 @@ fun App() {
             "login" -> LoginScreen(
                 onLoginSuccess = { role, userObj ->
                     when (role) {
-                        "admin" -> currentScreen = "admin"
+                        "admin", "super_admin" -> {
+                            loggedInAdmin = userObj as? Admin
+                            currentScreen = "admin"
+                        }
                         "member" -> {
                             val member = userObj as? Member
                             if (member != null) {
@@ -132,18 +191,25 @@ fun App() {
                 },
                 memberList = members,
                 trainerList = trainers,
-                adminAccount = adminAccount
+                adminList = admins
             )
             "admin" -> AdminDashboard(
                 members = members,
                 gymPackages = gymPackages,
                 ptPackages = ptPackages,
                 trainers = trainers,
+                admins = admins,
+                workoutSessions = workoutSessions,
+                transactions = transactions,
                 totalRevenue = totalRevenue,
-                adminAccount = adminAccount,
-                onUpdateAdmin = { adminAccount = it },
+                loggedInAdmin = loggedInAdmin!!,
+                onUpdateAdmin = { updated ->
+                    val idx = admins.indexOfFirst { it.username == updated.username }
+                    if (idx != -1) admins[idx] = updated
+                    if (loggedInAdmin?.username == updated.username) loggedInAdmin = updated
+                },
                 onUpdateRevenue = { totalRevenue = it },
-                onLogout = { currentScreen = "login" }
+                onLogout = { currentScreen = "login"; loggedInAdmin = null }
             )
             "member" -> MemberMainScreen(
                 initialMember = loggedInMember!!,
@@ -225,9 +291,49 @@ fun App() {
                                 println("DEBUG: Gagal update kouta member: ${e.message}")
                             }
                         }
+                    },
+                    onSaveWorkout = { session ->
+                        scope.launch {
+                            try {
+                                db.collection("workout_sessions").document(session.id).set(session)
+                            } catch (e: Exception) {
+                                println("DEBUG: Gagal simpan sesi latihan: ${e.message}")
+                            }
+                        }
                     }
                 )
             }
+        }
+
+        // --- DIALOG UPDATE FORCE ---
+        if (showUpdateDialog) {
+            AlertDialog(
+                onDismissRequest = { /* Force update tidak bisa di-dismiss */ },
+                containerColor = Color(0xFF112240),
+                title = { 
+                    Text(
+                        "Update Tersedia ($latestVersionName)", 
+                        color = Color.White, 
+                        fontWeight = FontWeight.Bold 
+                    ) 
+                },
+                text = { 
+                    Text(
+                        "Versi aplikasi Anda sudah terlalu lama. Silakan unduh versi terbaru untuk tetap dapat menggunakan aplikasi.",
+                        color = Color.LightGray
+                    ) 
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { openWebLink(downloadUrl) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3B82F6)
+                        )
+                    ) {
+                        Text("Download Sekarang", color = Color.White)
+                    }
+                }
+            )
         }
     }
 }

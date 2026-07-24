@@ -56,7 +56,7 @@ fun LoginScreen(
     onLoginSuccess: (String, Any?) -> Unit,
     memberList: List<Member>,
     trainerList: List<Trainer>,
-    adminAccount: Admin
+    adminList: List<Admin>
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -247,10 +247,14 @@ fun LoginScreen(
                                     errorMessage = "Username dan Password tidak boleh kosong!"
                                     return@Button
                                 }
-                                if (username == adminAccount.username && password == adminAccount.password) {
-                                    onLoginSuccess("admin", null)
-                                } else {
-                                    val member = memberList.find { it.username == username && it.password == password }
+                                
+                                val admin = adminList.find { it.username == username && it.password == password }
+                                if (admin != null) {
+                                    onLoginSuccess(admin.role, admin)
+                                    return@Button
+                                }
+                                
+                                val member = memberList.find { it.username == username && it.password == password }
                                     if (member != null) {
                                         onLoginSuccess("member", member)
                                         return@Button
@@ -261,7 +265,6 @@ fun LoginScreen(
                                         return@Button
                                     }
                                     errorMessage = "Login Gagal"
-                                }
                             },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(14.dp),

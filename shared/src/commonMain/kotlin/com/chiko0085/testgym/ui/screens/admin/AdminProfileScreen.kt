@@ -49,8 +49,12 @@ fun AdminProfileScreen(admin: Admin, onUpdate: (Admin) -> Unit, onBack: () -> Un
                     onClick = {
                         scope.launch {
                             try {
-                                val updated = Admin(username, password)
-                                db.collection("settings").document("admin_account").set(updated)
+                                val updated = admin.copy(username = username, password = password)
+                                // Jika username berubah, kita harus menghapus dokumen lama dan membuat yang baru
+                                if (admin.username != username) {
+                                    db.collection("admins").document(admin.username).delete()
+                                }
+                                db.collection("admins").document(username).set(updated)
                                 onUpdate(updated)
                                 snackbarHostState.showSnackbar("Profil Admin berhasil diperbarui!")
                             } catch (e: Exception) {

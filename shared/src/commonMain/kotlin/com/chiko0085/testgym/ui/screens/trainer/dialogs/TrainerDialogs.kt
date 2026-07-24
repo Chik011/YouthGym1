@@ -1,5 +1,6 @@
 package com.chiko0085.testgym.ui.screens.trainer.dialogs
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,10 +17,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chiko0085.testgym.model.ExerciseRecord
 import com.chiko0085.testgym.model.Member
 import com.chiko0085.testgym.model.Trainer
+import com.chiko0085.testgym.model.WorkoutSession
 import com.chiko0085.testgym.ui.theme.AccentBlue
 import com.chiko0085.testgym.ui.theme.CardDark
+import com.chiko0085.testgym.getCurrentTimeMillis
+import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -234,6 +239,160 @@ fun AttendanceDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Tutup", color = Color.White)
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WorkoutManagementDialog(
+    memberList: List<Member>,
+    trainer: Trainer,
+    onDismiss: () -> Unit,
+    onSaveWorkout: (WorkoutSession) -> Unit
+) {
+    var selectedMember by remember { mutableStateOf<Member?>(null) }
+    var exerciseName by remember { mutableStateOf("") }
+    var sets by remember { mutableStateOf("") }
+    var reps by remember { mutableStateOf("") }
+    var weight by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    
+    val exercises = remember { mutableStateListOf<ExerciseRecord>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = { Text("Program Latihan Member", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (selectedMember == null) {
+                    Text("Pilih Member:", color = AccentBlue, fontWeight = FontWeight.Bold)
+                    memberList.filter { it.remainingPtSessions > 0 }.forEach { member ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { selectedMember = member },
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f))
+                        ) {
+                            Text(member.name, modifier = Modifier.padding(12.dp), color = Color.White)
+                        }
+                    }
+                    if (memberList.none { it.remainingPtSessions > 0 }) {
+                        Text("Tidak ada member aktif PT.", color = Color.Gray)
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Member: ${selectedMember?.name}", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { selectedMember = null }) { Text("Ganti", color = AccentBlue) }
+                    }
+                    
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    
+                    Text("Tambah Latihan:", color = AccentBlue, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = exerciseName,
+                        onValueChange = { exerciseName = it },
+                        label = { Text("Nama Latihan (cth: Bench Press)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = sets,
+                            onValueChange = { sets = it },
+                            label = { Text("Sets") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                        OutlinedTextField(
+                            value = reps,
+                            onValueChange = { reps = it },
+                            label = { Text("Reps") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+                    
+                    OutlinedTextField(
+                        value = weight,
+                        onValueChange = { weight = it },
+                        label = { Text("Beban (cth: 50kg / BW)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    
+                    Button(
+                        onClick = {
+                            if (exerciseName.isNotEmpty()) {
+                                exercises.add(ExerciseRecord(exerciseName, sets.toIntOrNull() ?: 0, reps, weight))
+                                exerciseName = ""; sets = ""; reps = ""; weight = ""
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue.copy(alpha = 0.3f))
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Text("Tambahkan ke List")
+                    }
+                    
+                    if (exercises.isNotEmpty()) {
+                        Text("List Latihan:", color = Color.White, fontWeight = FontWeight.Bold)
+                        exercises.forEachIndexed { index, ex ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.02f))
+                            ) {
+                                Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${index + 1}. ${ex.name} (${ex.sets}x${ex.reps}) - ${ex.weight}", color = Color.LightGray, modifier = Modifier.weight(1f), fontSize = 13.sp)
+                                    IconButton(onClick = { exercises.removeAt(index) }) {
+                                        Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Catatan Latihan") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedMember != null && exercises.isNotEmpty()) {
+                        onSaveWorkout(
+                            WorkoutSession(
+                                id = "WKT-${Random.nextInt(10000, 99999)}",
+                                memberId = selectedMember!!.id,
+                                memberName = selectedMember!!.name,
+                                trainerId = trainer.id,
+                                trainerName = trainer.name,
+                                date = getCurrentTimeMillis(),
+                                exercises = exercises.toList(),
+                                notes = notes
+                            )
+                        )
+                    }
+                },
+                enabled = selectedMember != null && exercises.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) {
+                Text("Simpan Sesi Latihan", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal", color = Color.Gray)
             }
         }
     )

@@ -63,8 +63,11 @@ fun AdminDashboard(
     gymPackages: SnapshotStateList<GymPackage>,
     ptPackages: SnapshotStateList<PtPackage>,
     trainers: SnapshotStateList<Trainer>,
+    admins: SnapshotStateList<Admin>,
+    workoutSessions: SnapshotStateList<com.chiko0085.testgym.model.WorkoutSession>,
+    transactions: SnapshotStateList<com.chiko0085.testgym.model.Transaction>,
     totalRevenue: Double,
-    adminAccount: Admin,
+    loggedInAdmin: Admin,
     onUpdateAdmin: (Admin) -> Unit,
     onUpdateRevenue: (Double) -> Unit,
     onLogout: () -> Unit
@@ -84,6 +87,33 @@ fun AdminDashboard(
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    val allNavItems = listOf(
+        Triple("dashboard", "Home", Icons.Default.Home),
+        Triple("members", "Member", Icons.Default.Person),
+        Triple("packages", "Paket Gym", Icons.Default.ShoppingCart),
+        Triple("pt_packages", "Paket PT", Icons.Default.Star),
+        Triple("trainers", "Trainer", Icons.Default.Face),
+        Triple("workouts", "Progres", Icons.Default.Info),
+        Triple("reservations", "Padel", Icons.Default.DateRange),
+        Triple("wa_broadcast", "Broadcast", Icons.Default.Share),
+        Triple("revenue_detail", "Keuangan", Icons.AutoMirrored.Filled.List),
+        Triple("logs", "History", Icons.Default.History),
+        Triple("admins", "Admin", Icons.Default.Lock),
+        Triple("profile", "Settings", Icons.Default.Settings)
+    )
+
+    val navItems = allNavItems.filter { item ->
+        loggedInAdmin.role == "super_admin" || 
+        loggedInAdmin.permissions.contains(item.first) || 
+        item.first == "profile"
+    }
+
+    LaunchedEffect(navItems) {
+        if (navItems.isNotEmpty() && navItems.none { it.first == currentScreen }) {
+            currentScreen = navItems.first().first
+        }
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(DarkBgStart, DarkBgEnd)))) {
         val isDesktop = maxWidth > 800.dp
 
@@ -99,16 +129,6 @@ fun AdminDashboard(
                         }
                     }
                 ) {
-                    val navItems = listOf(
-                        Triple("dashboard", "Home", Icons.Default.Home),
-                        Triple("members", "Member", Icons.Default.Person),
-                        Triple("packages", "Paket Gym", Icons.Default.ShoppingCart),
-                        Triple("pt_packages", "Paket PT", Icons.Default.Star),
-                        Triple("trainers", "Trainer", Icons.Default.Face),
-                        Triple("reservations", "Padel", Icons.Default.DateRange),
-                        Triple("profile", "Settings", Icons.Default.Settings)
-                    )
-
                     navItems.forEach { (screen, label, icon) ->
                         NavigationRailItem(
                             selected = currentScreen == screen,
@@ -142,8 +162,11 @@ fun AdminDashboard(
                         gymPackages = gymPackages,
                         ptPackages = ptPackages,
                         trainers = trainers,
+                        admins = admins,
+                        workoutSessions = workoutSessions,
+                        transactions = transactions,
                         totalRevenue = totalRevenue,
-                        adminAccount = adminAccount,
+                        loggedInAdmin = loggedInAdmin,
                         onUpdateAdmin = onUpdateAdmin,
                         onUpdateRevenue = onUpdateRevenue,
                         onLogout = onLogout,
@@ -175,16 +198,6 @@ fun AdminDashboard(
                         }
                         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                         
-                        val navItems = listOf(
-                            Triple("dashboard", "Dashboard Home", Icons.Default.Home),
-                            Triple("members", "Kelola Member", Icons.Default.Person),
-                            Triple("packages", "Harga Paket Gym", Icons.Default.ShoppingCart),
-                            Triple("pt_packages", "Harga Paket PT", Icons.Default.Star),
-                            Triple("trainers", "Daftar Trainer", Icons.Default.Face),
-                            Triple("reservations", "Jadwal Padel", Icons.Default.DateRange),
-                            Triple("profile", "Pengaturan Akun", Icons.Default.Settings)
-                        )
-
                         navItems.forEach { (screen, label, icon) ->
                             NavigationDrawerItem(
                                 label = { Text(label) },
@@ -239,6 +252,10 @@ fun AdminDashboard(
                                         "pt_packages" -> "Paket PT"
                                         "trainers" -> "Personal Trainer"
                                         "reservations" -> "Jadwal Padel"
+                                        "workouts" -> "Progres Latihan"
+                                        "wa_broadcast" -> "WhatsApp Broadcast"
+                                        "revenue_detail" -> "Detail Keuangan"
+                                        "logs" -> "History Aktivitas"
                                         else -> "Profil Admin"
                                     },
                                     fontSize = 18.sp,
@@ -262,8 +279,11 @@ fun AdminDashboard(
                             gymPackages = gymPackages,
                             ptPackages = ptPackages,
                             trainers = trainers,
+                            admins = admins,
+                            workoutSessions = workoutSessions,
+                            transactions = transactions,
                             totalRevenue = totalRevenue,
-                            adminAccount = adminAccount,
+                            loggedInAdmin = loggedInAdmin,
                             onUpdateAdmin = onUpdateAdmin,
                             onUpdateRevenue = onUpdateRevenue,
                             onLogout = onLogout,
@@ -301,6 +321,7 @@ fun AdminDashboard(
                                     val idx = members.indexOfFirst { it.id == member.id }
                                     if (idx != -1) members[idx] = updated
                                 }
+                                com.chiko0085.testgym.util.AdminLogger.log(loggedInAdmin.username, "Reset Pendapatan", "Mereset histori pembayaran semua member menjadi 0")
                                 onUpdateRevenue(0.0)
                                 showResetDialog = false
                                 snackbarHostState.showSnackbar("Pendapatan berhasil direset ke 0")
@@ -336,6 +357,7 @@ fun AdminDashboard(
                                 try {
                                     val data = mapOf("remainingDays" to updated.remainingDays)
                                     db.collection("members").document(updated.id).update(data)
+                                    com.chiko0085.testgym.util.AdminLogger.log(loggedInAdmin.username, "Check-in Member", "Check-in member ${member.name} (Sisa hari: ${updated.remainingDays})")
                                     snackbarHostState.showSnackbar("Check-in berhasil untuk ${member.name}")
                                 } catch (e: Exception) {
                                     snackbarHostState.showSnackbar("Gagal check-in: ${e.message}")
@@ -402,6 +424,13 @@ fun AdminDashboard(
                             "packageName" to pkgName
                         )
                         db.collection("members").document(randomId).set(data)
+
+                        // Catat Transaksi
+                        val txId = "TX-${Random.nextInt(100000, 999999)}"
+                        val tx = com.chiko0085.testgym.model.Transaction(txId, n, price, "Gym Package", "Pendaftaran Member Baru: $pkgName", joinDate)
+                        db.collection("transactions").document(txId).set(tx)
+
+                        com.chiko0085.testgym.util.AdminLogger.log(loggedInAdmin.username, "Tambah Member", "Menambahkan member baru $n dengan paket $pkgName")
                     } catch (ex: Exception) {}
                 }
             }
@@ -439,6 +468,7 @@ fun AdminDashboard(
                             "gender" to finalMember.gender
                         )
                         db.collection("members").document(finalMember.id).update(data)
+                        com.chiko0085.testgym.util.AdminLogger.log(loggedInAdmin.username, "Edit Member", "Memperbarui data member ${finalMember.name}")
                     } catch (e: Exception) {}
                 }
             }
@@ -453,13 +483,15 @@ fun AdminDashboard(
             title = { Text("Hapus Member", color = Color.White) },
             text = { Text("Yakin ingin menghapus ${memberToDelete?.name} dari Database?", color = Color.LightGray) },
             confirmButton = {
+                val idToRemove = memberToDelete?.id ?: ""
+                val nameToRemove = memberToDelete?.name ?: ""
                 TextButton(onClick = {
                     scope.launch {
                         try {
-                            val idToRemove = memberToDelete?.id!!
                             members.removeAll { it.id == idToRemove }
-                            memberToDelete = null
                             db.collection("members").document(idToRemove).delete()
+                            com.chiko0085.testgym.util.AdminLogger.log(loggedInAdmin.username, "Hapus Member", "Menghapus member $nameToRemove dari database")
+                            memberToDelete = null
                         } catch (e: Exception) {}
                     }
                 }) { Text("Hapus", color = Color.Red, fontWeight = FontWeight.Bold) }
@@ -489,8 +521,11 @@ fun AdminContent(
     gymPackages: SnapshotStateList<GymPackage>,
     ptPackages: SnapshotStateList<PtPackage>,
     trainers: SnapshotStateList<Trainer>,
+    admins: SnapshotStateList<Admin>,
+    workoutSessions: SnapshotStateList<com.chiko0085.testgym.model.WorkoutSession>,
+    transactions: SnapshotStateList<com.chiko0085.testgym.model.Transaction>,
     totalRevenue: Double,
-    adminAccount: Admin,
+    loggedInAdmin: Admin,
     onUpdateAdmin: (Admin) -> Unit,
     onUpdateRevenue: (Double) -> Unit,
     onLogout: () -> Unit,
@@ -509,6 +544,7 @@ fun AdminContent(
             members = members,
             gymPackages = gymPackages,
             ptPackages = ptPackages,
+            admin = loggedInAdmin,
             onCheckIn = onCheckIn,
             onEdit = onEditMember,
             onDelete = onDeleteMember,
@@ -521,13 +557,25 @@ fun AdminContent(
         "pt_packages" -> PtPackageManagementScreen(ptPackages, onBack = { onNavigate("dashboard") })
         "trainers" -> TrainerManagementScreen(trainers, onBack = { onNavigate("dashboard") })
         "reservations" -> ReservationManagementScreen(onBack = { onNavigate("dashboard") })
-        "profile" -> AdminProfileScreen(adminAccount, onUpdateAdmin, onBack = { onNavigate("dashboard") })
+        "workouts" -> WorkoutHistoryScreen(workoutSessions, onBack = { onNavigate("dashboard") })
+        "wa_broadcast" -> WhatsAppBroadcastScreen(members, onBack = { onNavigate("dashboard") })
+        "revenue_detail" -> RevenueDetailScreen(
+            members = members,
+            transactions = transactions,
+            onBack = { onNavigate("dashboard") }
+        )
+        "logs" -> AdminLogScreen(onBack = { onNavigate("dashboard") })
+        "admins" -> AdminManagementScreen(admins, onBack = { onNavigate("dashboard") })
+        "profile" -> AdminProfileScreen(loggedInAdmin, onUpdateAdmin, onBack = { onNavigate("dashboard") })
         else -> AdminHomeScreen(
             members = members,
             trainers = trainers,
+            transactions = transactions,
+            admin = loggedInAdmin,
             totalRevenue = totalRevenue,
             onResetRevenue = onResetRevenue,
             onTrainerClick = onTrainerSchedule,
+            onViewDetail = { onNavigate("revenue_detail") },
             snackbarHostState = snackbarHostState,
             isDesktop = isDesktop
         )

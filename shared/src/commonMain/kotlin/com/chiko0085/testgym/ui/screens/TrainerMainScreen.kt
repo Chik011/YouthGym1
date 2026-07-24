@@ -48,6 +48,7 @@ fun TrainerMainScreen(
     onSaveProfile: (Trainer) -> Unit,
     onUpdatePhotoClick: (ByteArray) -> Unit,
     onUpdateMember: (Member) -> Unit,
+    onSaveWorkout: (com.chiko0085.testgym.model.WorkoutSession) -> Unit
 ) {
     val bgGradient = Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A192F)))
     val scope = rememberCoroutineScope()
@@ -57,6 +58,7 @@ fun TrainerMainScreen(
     var showAccountDialog by remember { mutableStateOf(false) }
     var isUploading by remember { mutableStateOf(false) }
     var showAttendanceDialog by remember { mutableStateOf(false) }
+    var showWorkoutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(trainer.profileImageUrl) {
         isUploading = false
@@ -194,6 +196,15 @@ fun TrainerMainScreen(
                                 Text("Absensi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text("Member PT", color = Color.Gray, fontSize = 10.sp)
                             }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable { showWorkoutDialog = true }
+                            ) {
+                                Icon(Icons.Default.Build, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Latihan", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Input Sesi", color = Color.Gray, fontSize = 10.sp)
+                            }
                         }
                     }
                 }
@@ -268,6 +279,18 @@ fun TrainerMainScreen(
                         val updatedMember = member.copy(remainingPtSessions = member.remainingPtSessions - 1)
                         onUpdateMember(updatedMember)
                     }
+                }
+            )
+        }
+
+        if (showWorkoutDialog) {
+            WorkoutManagementDialog(
+                memberList = memberList,
+                trainer = displayTrainer,
+                onDismiss = { showWorkoutDialog = false },
+                onSaveWorkout = { session ->
+                    onSaveWorkout(session)
+                    showWorkoutDialog = false
                 }
             )
         }
