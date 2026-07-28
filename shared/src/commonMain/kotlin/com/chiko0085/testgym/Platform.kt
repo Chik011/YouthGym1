@@ -23,3 +23,9 @@ expect fun initFirebase()
 expect fun createStorageData(bytes: ByteArray): Data
 
 expect fun isStorageSupported(): Boolean
+
+expect fun saveSetting(key: String, value: String)
+
+expect fun getSetting(key: String): String?
+
+expect fun clearSetting(key: String)

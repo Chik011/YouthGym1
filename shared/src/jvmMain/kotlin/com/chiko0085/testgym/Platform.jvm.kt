@@ -125,3 +125,29 @@ actual fun initFirebase() {
 actual fun createStorageData(bytes: ByteArray): Data = TODO("Firebase Storage not supported on JVM yet")
 
 actual fun isStorageSupported(): Boolean = false
+
+private val userPrefs = java.util.prefs.Preferences.userRoot().node("com.chiko0085.testgym.settings")
+
+actual fun saveSetting(key: String, value: String) {
+    try {
+        userPrefs.put(key, value)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+actual fun getSetting(key: String): String? {
+    return try {
+        userPrefs.get(key, null)
+    } catch (e: Exception) {
+        null
+    }
+}
+
+actual fun clearSetting(key: String) {
+    try {
+        userPrefs.remove(key)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}

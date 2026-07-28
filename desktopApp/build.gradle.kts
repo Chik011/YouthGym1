@@ -20,8 +20,8 @@ compose.desktop {
         mainClass = "com.chiko0085.testgym.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.chiko0085.testgym"
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe)
+            packageName = "YouthGym"
             packageVersion = "1.0.0"
         }
     }

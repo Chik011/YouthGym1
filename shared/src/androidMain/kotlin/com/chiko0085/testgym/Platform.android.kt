@@ -97,3 +97,17 @@ actual fun initFirebase() { }
 actual fun createStorageData(bytes: ByteArray): Data = Data(bytes)
 
 actual fun isStorageSupported(): Boolean = true
+
+private fun getPrefs() = androidContext?.getSharedPreferences("YouthGymPrefs", Context.MODE_PRIVATE)
+
+actual fun saveSetting(key: String, value: String) {
+    getPrefs()?.edit()?.putString(key, value)?.apply()
+}
+
+actual fun getSetting(key: String): String? {
+    return getPrefs()?.getString(key, null)
+}
+
+actual fun clearSetting(key: String) {
+    getPrefs()?.edit()?.remove(key)?.apply()
+}

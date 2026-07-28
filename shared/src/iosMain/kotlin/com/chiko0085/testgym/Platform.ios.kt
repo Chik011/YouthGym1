@@ -41,3 +41,15 @@ actual fun createStorageData(bytes: ByteArray): Data {
 }
 
 actual fun isStorageSupported(): Boolean = true
+
+actual fun saveSetting(key: String, value: String) {
+    platform.Foundation.NSUserDefaults.standardUserDefaults.setObject(value, forKey = key)
+}
+
+actual fun getSetting(key: String): String? {
+    return platform.Foundation.NSUserDefaults.standardUserDefaults.stringForKey(key)
+}
+
+actual fun clearSetting(key: String) {
+    platform.Foundation.NSUserDefaults.standardUserDefaults.removeObjectForKey(key)
+}

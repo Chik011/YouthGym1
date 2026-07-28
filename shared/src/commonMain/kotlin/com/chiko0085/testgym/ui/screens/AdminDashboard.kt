@@ -191,50 +191,57 @@ fun AdminDashboard(
                         drawerContainerColor = CardDark,
                         drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
                     ) {
-                        Spacer(Modifier.height(24.dp))
-                        Column(Modifier.padding(24.dp)) {
-                            Text("Admin Panel", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("Youth Gym Management", fontSize = 14.sp, color = Color.LightGray)
-                        }
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                        
-                        navItems.forEach { (screen, label, icon) ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Spacer(Modifier.height(24.dp))
+                            Column(Modifier.padding(24.dp)) {
+                                Text("Admin Panel", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("Youth Gym Management", fontSize = 14.sp, color = Color.LightGray)
+                            }
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                            
+                            navItems.forEach { (screen, label, icon) ->
+                                NavigationDrawerItem(
+                                    label = { Text(label) },
+                                    selected = currentScreen == screen,
+                                    onClick = {
+                                        currentScreen = screen
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    icon = { Icon(icon, null) },
+                                    colors = NavigationDrawerItemDefaults.colors(
+                                        unselectedContainerColor = Color.Transparent,
+                                        selectedContainerColor = AccentBlue.copy(alpha = 0.1f),
+                                        selectedTextColor = AccentBlue,
+                                        unselectedTextColor = Color.LightGray,
+                                        selectedIconColor = AccentBlue,
+                                        unselectedIconColor = Color.LightGray
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
                             NavigationDrawerItem(
-                                label = { Text(label) },
-                                selected = currentScreen == screen,
-                                onClick = {
-                                    currentScreen = screen
-                                    scope.launch { drawerState.close() }
-                                },
-                                icon = { Icon(icon, null) },
+                                label = { Text("Keluar (Logout)") },
+                                selected = false,
+                                onClick = onLogout,
+                                icon = { Icon(Icons.Default.ExitToApp, null) },
                                 colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedTextColor = Color(0xFFF87171), 
+                                    unselectedIconColor = Color(0xFFF87171),
+                                    selectedTextColor = Color(0xFFF87171),
+                                    selectedIconColor = Color(0xFFF87171),
                                     unselectedContainerColor = Color.Transparent,
-                                    selectedContainerColor = AccentBlue.copy(alpha = 0.1f),
-                                    selectedTextColor = AccentBlue,
-                                    unselectedTextColor = Color.LightGray,
-                                    selectedIconColor = AccentBlue,
-                                    unselectedIconColor = Color.LightGray
+                                    selectedContainerColor = Color.Transparent
                                 ),
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                             )
+                            Spacer(modifier = Modifier.height(24.dp))
                         }
-                        
-                        Spacer(modifier = Modifier.weight(1f))
-                        NavigationDrawerItem(
-                            label = { Text("Keluar (Logout)") },
-                            selected = false,
-                            onClick = onLogout,
-                            icon = { Icon(Icons.Default.ExitToApp, null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                unselectedTextColor = Color(0xFFF87171), 
-                                unselectedIconColor = Color(0xFFF87171),
-                                selectedTextColor = Color(0xFFF87171),
-                                selectedIconColor = Color(0xFFF87171),
-                                unselectedContainerColor = Color.Transparent,
-                                selectedContainerColor = Color.Transparent
-                            ),
-                            modifier = Modifier.padding(12.dp)
-                        )
                     }
                 }
             ) {

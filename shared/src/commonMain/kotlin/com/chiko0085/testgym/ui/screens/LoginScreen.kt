@@ -58,8 +58,8 @@ fun LoginScreen(
     trainerList: List<Trainer>,
     adminList: List<Admin>
 ) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf(com.chiko0085.testgym.getSetting("draft_username") ?: "") }
+    var password by remember { mutableStateOf(com.chiko0085.testgym.getSetting("draft_password") ?: "") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var isVisible by remember { mutableStateOf(false) }
@@ -197,7 +197,11 @@ fun LoginScreen(
 
                         ElegantTextField(
                             value = username,
-                            onValueChange = { username = it; errorMessage = "" },
+                            onValueChange = { 
+                                username = it
+                                errorMessage = "" 
+                                com.chiko0085.testgym.saveSetting("draft_username", it)
+                            },
                             label = "Username",
                             leadingContent = { Icon(Icons.Default.Person, null, tint = if (username.isNotEmpty()) NeonBlue else TextSub, modifier = Modifier.size(20.dp)) },
                             isError = errorMessage.isNotEmpty()
@@ -207,7 +211,11 @@ fun LoginScreen(
 
                         ElegantTextField(
                             value = password,
-                            onValueChange = { password = it; errorMessage = "" },
+                            onValueChange = { 
+                                password = it
+                                errorMessage = "" 
+                                com.chiko0085.testgym.saveSetting("draft_password", it)
+                            },
                             label = "Password",
                             leadingContent = { Icon(Icons.Default.Lock, null, tint = if (password.isNotEmpty()) NeonBlue else TextSub, modifier = Modifier.size(20.dp)) },
                             trailingContent = {
@@ -250,21 +258,28 @@ fun LoginScreen(
                                 
                                 val admin = adminList.find { it.username == username && it.password == password }
                                 if (admin != null) {
+                                    com.chiko0085.testgym.saveSetting("session_role", admin.role)
+                                    com.chiko0085.testgym.saveSetting("session_user_id", admin.username)
                                     onLoginSuccess(admin.role, admin)
                                     return@Button
                                 }
                                 
                                 val member = memberList.find { it.username == username && it.password == password }
-                                    if (member != null) {
-                                        onLoginSuccess("member", member)
-                                        return@Button
-                                    }
-                                    val trainer = trainerList.find { it.username == username && it.password == password }
-                                    if (trainer != null) {
-                                        onLoginSuccess("trainer", trainer)
-                                        return@Button
-                                    }
-                                    errorMessage = "Login Gagal"
+                                if (member != null) {
+                                    com.chiko0085.testgym.saveSetting("session_role", "member")
+                                    com.chiko0085.testgym.saveSetting("session_user_id", member.id)
+                                    onLoginSuccess("member", member)
+                                    return@Button
+                                }
+
+                                val trainer = trainerList.find { it.username == username && it.password == password }
+                                if (trainer != null) {
+                                    com.chiko0085.testgym.saveSetting("session_role", "trainer")
+                                    com.chiko0085.testgym.saveSetting("session_user_id", trainer.id)
+                                    onLoginSuccess("trainer", trainer)
+                                    return@Button
+                                }
+                                errorMessage = "Login Gagal"
                             },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(14.dp),

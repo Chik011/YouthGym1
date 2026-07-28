@@ -151,6 +151,35 @@ fun App() {
                 } catch (e: Exception) {
                     println("DEBUG: Gagal ambil admins: ${e.message}")
                 }
+
+                // Auto-login dari sesi tersimpan jika belum logout
+                val savedRole = getSetting("session_role")
+                val savedUserId = getSetting("session_user_id")
+                if (!savedRole.isNullOrEmpty() && !savedUserId.isNullOrEmpty()) {
+                    when (savedRole) {
+                        "admin", "super_admin" -> {
+                            val admin = admins.find { it.username == savedUserId }
+                            if (admin != null) {
+                                loggedInAdmin = admin
+                                currentScreen = "admin"
+                            }
+                        }
+                        "member" -> {
+                            val member = members.find { it.id == savedUserId || it.username == savedUserId }
+                            if (member != null) {
+                                loggedInMember = member
+                                currentScreen = "member"
+                            }
+                        }
+                        "trainer" -> {
+                            val trainer = trainers.find { it.id == savedUserId || it.username == savedUserId }
+                            if (trainer != null) {
+                                loggedInTrainer = trainer
+                                currentScreen = "trainer"
+                            }
+                        }
+                    }
+                }
                 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -162,6 +191,16 @@ fun App() {
                     ))
                 }
             }
+        }
+
+        val performLogout = {
+            clearSetting("session_role")
+            clearSetting("session_user_id")
+            clearSetting("draft_password")
+            loggedInAdmin = null
+            loggedInMember = null
+            loggedInTrainer = null
+            currentScreen = "login"
         }
 
         // Navigasi layar
@@ -209,11 +248,11 @@ fun App() {
                     if (loggedInAdmin?.username == updated.username) loggedInAdmin = updated
                 },
                 onUpdateRevenue = { totalRevenue = it },
-                onLogout = { currentScreen = "login"; loggedInAdmin = null }
+                onLogout = performLogout
             )
             "member" -> MemberMainScreen(
                 initialMember = loggedInMember!!,
-                onLogout = { currentScreen = "login" },
+                onLogout = performLogout,
                 onUpdateMember = { updated ->
                     val index = members.indexOfFirst { it.id == updated.id }
                     if (index != -1) members[index] = updated
@@ -248,7 +287,7 @@ fun App() {
                 TrainerMainScreen(
                     trainer = liveTrainer,
                     memberList = members,
-                    onLogout = { currentScreen = "login" },
+                    onLogout = performLogout,
                     onSaveProfile = { updated ->
                         val index = trainers.indexOfFirst { it.id == updated.id }
                         if (index != -1) trainers[index] = updated
